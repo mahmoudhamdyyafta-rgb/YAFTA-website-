@@ -1,0 +1,6 @@
+{
+  "name": "YAFTA Advertising Portfolio",
+  "description": "High-end luxury portfolio website for YAFTA Advertising Agency (يافطة للدعاية والإعلان), showcasing signage, cladding, premium printing, digital solutions, and an interactive client portal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

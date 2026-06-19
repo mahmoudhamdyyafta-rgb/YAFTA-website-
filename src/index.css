@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&family=Fira+Code:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Cairo", "Outfit", system-ui, -apple-system, sans-serif;
+  --font-mono: "Fira Code", monospace;
+  
+  --color-gold-50: #faf6ea;
+  --color-gold-100: #f3e9c9;
+  --color-gold-200: #e6d093;
+  --color-gold-300: #d6b359;
+  --color-gold-400: #c5972d;
+  --color-gold-505: #d4af37; /* Metallic Bright Gold */
+  --color-gold-500: #aa7d1e;
+  --color-gold-600: #8c6214;
+  --color-gold-700: #6d4a0f;
+  --color-gold-800: #4e320a;
+  --color-gold-900: #331f05;
+  --color-gold-950: #1c1002;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0d0d0d;
+}
+::-webkit-scrollbar-thumb {
+  background: #aa7d1e;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #d4af37;
+}
+
+/* Glassmorphism helpers */
+.glass-panel {
+  background: rgba(15, 15, 15, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(212, 175, 55, 0.15);
+}
+
+.gold-glow {
+  text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+}
+
+.gold-gradient-text {
+  background: linear-gradient(135deg, #f3e9c9 0%, #aa7d1e 50%, #d4af37 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gold-border-glow {
+  box-shadow: 0 0 15px rgba(170, 125, 30, 0.1);
+}
+
