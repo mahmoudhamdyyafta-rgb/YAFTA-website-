@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { PageId, CompanyInfo, LogoConfig, UserAccount } from '../types';
 import { Menu, X, Landmark, Globe, Hammer, ShieldAlert, Award, ChevronDown, User, LogIn } from 'lucide-react';
 import LogoRenderer from './LogoRenderer';
+import GoldParticles from './GoldParticles';
 
 interface Props {
   activePage: PageId;
@@ -18,9 +19,10 @@ interface Props {
   currentUser?: UserAccount | null;
   onOpenAuth?: () => void;
   onLogout?: () => void;
+  isLuxuryGold?: boolean;
 }
 
-export default function Navbar({ activePage, setActivePage, isAr, setIsAr, companyInfo, logoConfig, currentUser, onOpenAuth, onLogout }: Props) {
+export default function Navbar({ activePage, setActivePage, isAr, setIsAr, companyInfo, logoConfig, currentUser, onOpenAuth, onLogout, isLuxuryGold }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [showSolutionsDropdown, setShowSolutionsDropdown] = useState(false);
 
@@ -86,7 +88,8 @@ export default function Navbar({ activePage, setActivePage, isAr, setIsAr, compa
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-neutral-950/90 backdrop-blur-md border-b border-gold-500/20 text-white transition-all duration-300">
+    <header className="sticky top-0 z-50 bg-neutral-950/90 backdrop-blur-md border-b border-gold-500/20 text-white transition-all duration-300 overflow-hidden">
+      {isLuxuryGold && <GoldParticles count={15} opacity={0.7} speed={0.35} />}
       {/* Top micro bar for phone / urgency */}
       <div className="bg-gradient-to-r from-gold-950 via-neutral-950 to-gold-950 py-1.5 px-4 text-center border-b border-gold-500/10 hidden sm:block">
         <div className="max-w-7xl mx-auto flex justify-between items-center text-xs text-gold-252 text-gold-300">

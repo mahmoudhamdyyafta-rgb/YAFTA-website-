@@ -6,6 +6,7 @@ import {
   Layers, Paintbrush, Video, Film, Eye, Type, Sparkle, ShoppingBag, Grid, 
   Smile, Wind, ZapOff, BookOpen, ExternalLink, Image as ImageIcon
 } from 'lucide-react';
+import GoldParticles from './GoldParticles';
 
 interface ExperienceStudioProps {
   isAr: boolean;
@@ -471,6 +472,7 @@ export default function ExperienceStudio({
 
   return (
     <div className="fixed inset-0 z-55 bg-neutral-950/95 backdrop-blur-md flex flex-col md:grid md:grid-cols-12 overflow-hidden text-right font-sans" dir={isAr ? "rtl" : "ltr"}>
+      {config.background?.type === 'luxury-gold' && <GoldParticles count={30} opacity={0.65} speed={0.4} />}
       
       {/* LEFT COLUMN: VISUAL CONTROLS PANEL (7 cols) */}
       <div className="col-span-7 flex flex-col h-full border-l border-gold-505/20 overflow-y-auto">

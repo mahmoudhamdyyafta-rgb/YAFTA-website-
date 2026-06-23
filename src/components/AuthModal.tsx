@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { UserRole, UserAccount } from '../types';
 import { X, LogIn, UserPlus, Eye, EyeOff, Shield, Users, Briefcase, User, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import GoldParticles from './GoldParticles';
 
 interface Props {
   isOpen: boolean;
@@ -13,9 +14,10 @@ interface Props {
   isAr: boolean;
   onLoginSuccess: (user: UserAccount) => void;
   triggerToast: (msg: string) => void;
+  isLuxuryGold?: boolean;
 }
 
-export default function AuthModal({ isOpen, onClose, isAr, onLoginSuccess, triggerToast }: Props) {
+export default function AuthModal({ isOpen, onClose, isAr, onLoginSuccess, triggerToast, isLuxuryGold }: Props) {
   const [tab, setTab] = useState<'login' | 'register'>('login');
   
   // Login fields
@@ -156,6 +158,7 @@ export default function AuthModal({ isOpen, onClose, isAr, onLoginSuccess, trigg
   return (
     <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
       <div className="relative w-full max-w-lg bg-neutral-950 border border-gold-505/30 rounded-3xl overflow-hidden shadow-2xl flex flex-col font-sans">
+        {isLuxuryGold && <GoldParticles count={15} opacity={0.7} speed={0.4} />}
         
         {/* Decorative Top Accent Bar */}
         <div className="h-1.5 w-full bg-gradient-to-r from-gold-600 via-gold-505 to-gold-300"></div>

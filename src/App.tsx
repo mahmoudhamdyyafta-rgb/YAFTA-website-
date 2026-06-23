@@ -10,6 +10,7 @@ import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
 import ExperienceStudio from './components/ExperienceStudio';
 import IntroAnimation from './components/IntroAnimation';
+import GoldParticles from './components/GoldParticles';
 
 // Pages
 import Home from './pages/Home';
@@ -867,6 +868,7 @@ export default function App() {
         currentUser={currentUser}
         onOpenAuth={() => setIsAuthOpen(true)}
         onLogout={handleLogout}
+        isLuxuryGold={experienceConfig.background?.type === 'luxury-gold'}
       />
 
       {/* Main active page content */}
@@ -2904,6 +2906,7 @@ export default function App() {
         isAr={isAr} 
         onLoginSuccess={handleLoginSuccess}
         triggerToast={triggerToast}
+        isLuxuryGold={experienceConfig.background?.type === 'luxury-gold'}
       />
 
       {/* 🔮 SUPER ADMIN UNLIMITED VISUAL SYSTEM EXPERIENCE STUDIO MODAL */}
@@ -2926,6 +2929,7 @@ export default function App() {
       {selectedProject && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-55 overflow-y-auto">
           <div className="bg-neutral-950 border border-gold-505/30 rounded-3xl max-w-4xl w-full my-8 relative overflow-hidden flex flex-col shadow-2xl animate-scale-up max-h-[90vh]">
+            {experienceConfig.background?.type === 'luxury-gold' && <GoldParticles count={30} opacity={0.70} speed={0.35} />}
             
             {/* Modal header */}
             <div className="p-5 md:p-6 bg-neutral-900/80 border-b border-gold-500/10 flex items-center justify-between z-10">
