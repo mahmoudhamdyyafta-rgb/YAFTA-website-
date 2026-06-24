@@ -8,10 +8,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { PageId, Project, BeforeAfterItem } from '../types';
 import { PROJECTS_DATA, BEFORE_AFTER_DATA } from '../data';
 import BeforeAfterSlider from '../components/BeforeAfterSlider';
+import { jsPDF } from 'jspdf';
 import { 
   Calendar, Tag, ShieldCheck, FileText, ArrowLeft, Star, MessageSquare, 
   GripVertical, Edit2, Trash2, CheckCircle2, Eye, EyeOff, Plus, 
-  Settings, Check, X, Shield, RefreshCw, Sparkles, Image, Play, Sliders
+  Settings, Check, X, Shield, RefreshCw, Sparkles, Image, Play, Sliders,
+  Download, Clock, Users
 } from 'lucide-react';
 
 interface Props {
@@ -210,14 +212,247 @@ export default function Portfolio({
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
+
+  const handleDownloadPDF = async (project: Project) => {
+    setIsDownloadingPDF(true);
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      let hasArabicFont = false;
+
+      if (isAr) {
+        try {
+          // Fetch Cairo Arabic font from raw.githubusercontent.com for native Arabic text support in jsPDF
+          const fontUrl = 'https://raw.githubusercontent.com/google/fonts/main/ofl/cairo/Cairo-Regular.ttf';
+          const response = await fetch(fontUrl);
+          if (response.ok) {
+            const arrayBuffer = await response.arrayBuffer();
+            let binary = '';
+            const bytes = new Uint8Array(arrayBuffer);
+            for (let i = 0; i < bytes.byteLength; i++) {
+              binary += String.fromCharCode(bytes[i]);
+            }
+            const base64 = window.btoa(binary);
+            doc.addFileToVFS('Cairo-Regular.ttf', base64);
+            doc.addFont('Cairo-Regular.ttf', 'Cairo', 'normal');
+            doc.setFont('Cairo');
+            hasArabicFont = true;
+          }
+        } catch (err) {
+          console.warn('Failed to load Arabic font, falling back to English layout:', err);
+        }
+      }
+
+      // 1. Top Decorative Gold Border
+      doc.setFillColor(229, 192, 96); // Gold #E5C060
+      doc.rect(0, 0, 210, 5, 'F');
+
+      // 2. Dark Luxury Header Band
+      doc.setFillColor(23, 23, 23); // #171717
+      doc.rect(0, 5, 210, 25, 'F');
+
+      // 3. Header Text Branding
+      doc.setTextColor(255, 255, 255);
+      if (hasArabicFont) {
+        doc.setFont('Cairo', 'normal');
+      } else {
+        doc.setFont('helvetica', 'bold');
+      }
+      doc.setFontSize(16);
+      doc.text('YAFTA®', 15, 17);
+
+      doc.setTextColor(229, 192, 96); // Gold
+      doc.setFontSize(8);
+      doc.text(isAr ? 'يافطة - لافتات وواجهات كلادينج فاخرة' : 'ELITE SIGNAGE & CLADDING', 15, 22);
+
+      doc.setTextColor(163, 163, 163); // gray-400
+      doc.setFontSize(9);
+      doc.text(isAr ? 'ملخص مشروع معتمد وموثق' : 'PROJECT BRIEF & CASE STUDY', 145, 20);
+
+      // 4. Header-Body Gold Divider
+      doc.setFillColor(229, 192, 96);
+      doc.rect(0, 30, 210, 1, 'F');
+
+      // 5. Document Content Area
+      let currentY = 45;
+
+      // Category badge
+      doc.setFillColor(229, 192, 96, 0.15);
+      doc.rect(15, currentY, 45, 6, 'F');
+      doc.setTextColor(180, 140, 50);
+      doc.setFontSize(7);
+      doc.text(project.category.toUpperCase() + ' CASE STUDY', 17, currentY + 4);
+
+      currentY += 12;
+
+      // Project Title
+      doc.setTextColor(23, 23, 23);
+      doc.setFontSize(18);
+      const titleText = isAr ? project.titleAr : project.titleEn;
+      const splitTitle = doc.splitTextToSize(titleText, 180);
+      doc.text(splitTitle, 15, currentY);
+      currentY += (splitTitle.length * 8) + 4;
+
+      // Client line
+      doc.setTextColor(115, 115, 115);
+      doc.setFontSize(10);
+      const partnerText = isAr 
+        ? `شريك العمل: ${project.clientAr}` 
+        : `Client Partner: ${project.clientEn}`;
+      doc.text(partnerText, 15, currentY);
+      currentY += 8;
+
+      // Metadata Table/Box
+      doc.setFillColor(250, 250, 250);
+      doc.setDrawColor(229, 192, 96, 0.3);
+      doc.rect(15, currentY, 180, 24, 'FD');
+
+      // Metadata labels
+      doc.setFontSize(8);
+      doc.setTextColor(115, 115, 115);
+      doc.text(isAr ? 'القطاع الصناعي' : 'INDUSTRY SECTOR', 20, currentY + 7);
+      doc.text(isAr ? 'نوع الخدمة والمواصفات' : 'SERVICE TYPE', 20, currentY + 17);
+      doc.text(isAr ? 'تاريخ التسليم والاعتماد' : 'COMPLETION DATE', 120, currentY + 7);
+      doc.text(isAr ? 'مرجع الملف الفني' : 'DOCUMENT REFERENCE', 120, currentY + 17);
+
+      doc.setTextColor(23, 23, 23);
+      doc.setFontSize(9);
+      doc.text(isAr ? project.industryAr : project.industryEn || 'General Commercial', 20, currentY + 11);
+      doc.text(isAr ? project.serviceTypeAr : project.serviceTypeEn || 'Architectural Signage', 20, currentY + 21);
+      doc.text(project.completionDate || '2026', 120, currentY + 11);
+      doc.text(`YFT-CS-${project.id.toUpperCase().substring(0, 8)}`, 120, currentY + 21);
+
+      currentY += 36;
+
+      // Section 1: Overview
+      doc.setDrawColor(229, 192, 96);
+      doc.setFillColor(229, 192, 96);
+      doc.rect(15, currentY, 3, 5, 'F');
+
+      doc.setTextColor(23, 23, 23);
+      doc.setFontSize(12);
+      doc.text(isAr ? '1. ملخص المشروع وأهداف العمل' : '1. PROJECT OVERVIEW & OBJECTIVES', 21, currentY + 4);
+      currentY += 10;
+
+      doc.setFontSize(9.5);
+      doc.setTextColor(64, 64, 64);
+      const overviewText = isAr ? project.overviewAr : project.overviewEn;
+      const splitOverview = doc.splitTextToSize(overviewText, 180);
+      doc.text(splitOverview, 15, currentY);
+      currentY += (splitOverview.length * 5) + 12;
+
+      // Section 2: Specifications
+      doc.setFillColor(229, 192, 96);
+      doc.rect(15, currentY, 3, 5, 'F');
+
+      doc.setTextColor(23, 23, 23);
+      doc.setFontSize(12);
+      doc.text(isAr ? '2. المواصفات الفنية والهندسية' : '2. TECHNICAL BUILD SPECIFICATIONS', 21, currentY + 4);
+      currentY += 10;
+
+      doc.setFontSize(9.5);
+      doc.setTextColor(64, 64, 64);
+
+      const specsList = isAr 
+        ? (project.specificationsAr && project.specificationsAr.length > 0 ? project.specificationsAr : ['مقاومة عالية للرياح وعوامل الرطوبة والطقس الصعب.', 'إضاءة ليد موفرة للطاقة مع توزيع هندسي متناسق.', 'تصنيع بدقة الليزر للهياكل والمقاطع الفولاذية والأكريليك.'])
+        : (project.specificationsEn && project.specificationsEn.length > 0 ? project.specificationsEn : ['Wind load safe structural compliance sealed by experts.', 'Samsung premium LED modules with balanced light dispersion.', 'Weatherproof thermal protection coating with warranty.']);
+
+      specsList.forEach((spec) => {
+        doc.setFillColor(229, 192, 96);
+        doc.circle(18, currentY + 2.5, 1, 'F');
+        const splitSpec = doc.splitTextToSize(spec, 172);
+        doc.text(splitSpec, 22, currentY + 4);
+        currentY += (splitSpec.length * 5) + 2;
+      });
+
+      currentY += 10;
+
+      // Section 3: Project Results
+      doc.setFillColor(229, 192, 96);
+      doc.rect(15, currentY, 3, 5, 'F');
+
+      doc.setTextColor(23, 23, 23);
+      doc.setFontSize(12);
+      doc.text(isAr ? '3. الأثر البصري والنتائج التجارية' : '3. IMPACT & VERIFIED COMMERCIAL RESULTS', 21, currentY + 4);
+      currentY += 10;
+
+      // Results box container (golden tint block)
+      doc.setFillColor(253, 250, 242); // Warm pale gold
+      doc.setDrawColor(229, 192, 96, 0.4);
+      
+      const resultsText = isAr ? project.resultsAr : project.resultsEn || 'Dramatically enhanced outdoor visual prominence.';
+      const splitResults = doc.splitTextToSize(resultsText, 170);
+      const resultsBoxHeight = (splitResults.length * 5) + 10;
+
+      doc.rect(15, currentY, 180, resultsBoxHeight, 'FD');
+      
+      doc.setTextColor(140, 110, 40);
+      doc.text(splitResults, 20, currentY + 7);
+
+      currentY += resultsBoxHeight + 15;
+
+      // Section 4: Feedback
+      const feedbackText = isAr ? project.feedbackAr : project.feedbackEn;
+      if (feedbackText) {
+        doc.setFillColor(229, 192, 96);
+        doc.rect(15, currentY, 3, 5, 'F');
+
+        doc.setTextColor(23, 23, 23);
+        doc.setFontSize(12);
+        doc.text(isAr ? '4. رأي شريك النجاح' : '4. PARTNER ENDORSEMENT', 21, currentY + 4);
+        currentY += 10;
+
+        doc.setTextColor(64, 64, 64);
+        const quotedFeedback = `"${feedbackText}"`;
+        const splitFeedback = doc.splitTextToSize(quotedFeedback, 180);
+        doc.text(splitFeedback, 15, currentY);
+        currentY += (splitFeedback.length * 5) + 6;
+
+        doc.setTextColor(115, 115, 115);
+        doc.setFontSize(8.5);
+        doc.text(isAr ? `— ممثل شركة ${project.clientAr}` : `— ${project.clientEn} representative`, 15, currentY);
+      }
+
+      // Page Footer line
+      doc.setFillColor(229, 192, 96);
+      doc.rect(0, 287, 210, 10, 'F');
+
+      doc.setTextColor(23, 23, 23);
+      doc.setFontSize(8);
+      doc.text(isAr ? 'يافطة للإعلانات الخارجية وحلول الكلادينج واللافتات المعمارية الفاخرة' : 'YAFTA® EXPERIMENTAL LABS & OUTDOOR SOLUTIONS', 15, 293.5);
+      
+      doc.setTextColor(255, 255, 255);
+      doc.text(isAr ? 'وثيقة مواصفات فنية معتمدة' : 'CONFIDENTIAL TECHNICAL SPEC SHEET', 145, 293.5);
+
+      // Save file
+      const safeTitle = project.titleEn.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      doc.save(`yafta-case-study-${safeTitle}.pdf`);
+
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert(isAr ? 'عذراً، حدث خطأ أثناء إعداد ملف PDF. يرجى المحاولة مرة أخرى.' : 'Sorry, an error occurred while preparing the PDF. Please try again.');
+    } finally {
+      setIsDownloadingPDF(false);
+    }
+  };
 
   // Modal displays
   const [zoomedBaProject, setZoomedBaProject] = useState<Project | null>(null);
   const [adminEditingProject, setAdminEditingProject] = useState<Project | null>(null);
   const [isAdminCreatingProject, setIsAdminCreatingProject] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
+  const [activeTimelineStep, setActiveTimelineStep] = useState(4);
 
-  const isAdmin = currentUser?.role === 'Admin';
+  useEffect(() => {
+    setActiveTimelineStep(4);
+  }, [selectedProject]);
+
+  const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'Super Admin';
 
   // 14 Required categories exactly
   const [categoriesList, setCategoriesList] = useState(() => {
@@ -397,6 +632,234 @@ export default function Portfolio({
     }
   };
 
+  const getProjectMilestones = (project: Project) => {
+    const cat = project.category || 'signage';
+    const compDate = project.completionDate || '2025-11-20';
+
+    // Helper to calculate date relative to completionDate
+    const getRelDate = (offsetDays: number) => {
+      if (!compDate) return '';
+      try {
+        const d = new Date(compDate);
+        if (isNaN(d.getTime())) return compDate;
+        d.setDate(d.getDate() - offsetDays);
+        return d.toLocaleDateString(isAr ? 'ar-EG' : 'en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+      } catch (e) {
+        return compDate;
+      }
+    };
+
+    if (cat === 'cladding') {
+      return [
+        {
+          id: 0,
+          titleAr: 'المعاينة والرفع الهندسي',
+          titleEn: 'Site Survey & Laser Scan',
+          date: getRelDate(25),
+          duration: isAr ? '٣ أيام' : '3 Days',
+          statusAr: 'مكتمل ومعتمد ✓',
+          statusEn: 'Completed & Certified ✓',
+          descAr: 'رفع المقاسات الميدانية بدقة الليزر ثلاثي الأبعاد وفحص سلامة الهيكل الإنشائي الحامل لاستيعاب وزن الواجهة الإجمالي.',
+          descEn: '3D laser-guided site mapping, structural wall load-bearing safety audit, and initial architectural alignment check.',
+          teamAr: 'مهندس مساحة مالي + خبير إنشائي',
+          teamEn: 'Survey Engineer + Structural Expert',
+        },
+        {
+          id: 1,
+          titleAr: 'التصميم والتحليل الإنشائي',
+          titleEn: 'Engineering & CAD Design',
+          date: getRelDate(18),
+          duration: isAr ? '٤ أيام' : '4 Days',
+          statusAr: 'مخططات جاهزة ✓',
+          statusEn: 'Drawings Approved ✓',
+          descAr: 'تصميم الرسومات التنفيذية التفصيلية وحساب مقاومة أحمال الرياح وضغط الفواصل للكلادينج طبقاً للمواصفات القياسية.',
+          descEn: 'High-fidelity 3D CAD modeling, wind-load static resistance calculations, and fabrication shop-drawing approvals.',
+          teamAr: 'رئيس وحدة التصميم الهندسي',
+          teamEn: 'Lead Architectural Designer',
+        },
+        {
+          id: 2,
+          titleAr: 'التفريز والتشغيل الرقمي',
+          titleEn: 'CNC Processing & Fabrication',
+          date: getRelDate(10),
+          duration: isAr ? '٥ أيام' : '5 Days',
+          statusAr: 'تم التجهيز والمطابقة ✓',
+          statusEn: 'Milled & Verified ✓',
+          descAr: 'قص وتجهيز وتفريز ألواح الكلادينج المقاومة للحريق (Grade A2) باستخدام ماكينات CNC رقمية بمصنعنا لضمان دقة الزوايا.',
+          descEn: 'Precision CNC routing & milling of fire-rated ACP boards (A2 grade), corner grooving, and protective foil wrapping.',
+          teamAr: 'فريق المصنع والتشغيل الميكانيكي',
+          teamEn: 'CNC Manufacturing Squad',
+        },
+        {
+          id: 3,
+          titleAr: 'اختبار الجودة والتجميع',
+          titleEn: 'Sub-Frame QA & Test',
+          date: getRelDate(4),
+          duration: isAr ? 'يومان' : '2 Days',
+          statusAr: 'آمن واجتاز الفحص ✓',
+          statusEn: '100% QA Passed ✓',
+          descAr: 'تجميع الهيكل الحديدي الفرعي الحامل والمعالج ضد الصدأ ومطابقة أبعاد التعليق مع اختبار مقاومة الاهتزاز.',
+          descEn: 'Pre-assembly structural load testing of anti-rust treated iron sub-frame and vibration durability benchmark.',
+          teamAr: 'مهندس فحص جودة معتمد',
+          teamEn: 'QA QC Engineering Officer',
+        },
+        {
+          id: 4,
+          titleAr: 'التركيب والاعتماد الميداني',
+          titleEn: 'On-Site Installation',
+          date: compDate,
+          duration: isAr ? '٤ أيام' : '4 Days',
+          statusAr: 'تم التسليم والتشغيل ✓',
+          statusEn: 'Fully Installed & Active ✓',
+          descAr: 'تثبيت الألواح بالارتفاعات المطلوبة وعزل الفواصل بسيليكون إنشائي فاخر مضاد للطقس والتسليم النهائي للعميل.',
+          descEn: 'High-altitude crane hoisting, anchor fixation, structural weather-tight weather sealing, and ultimate client handover.',
+          teamAr: 'كبير مهندسي المواقع + طاقم التركيبات',
+          teamEn: 'Site Chief + Installation Rigging Crew',
+        },
+      ];
+    } else if (cat === 'acrylic' || cat === 'stainless' || cat === 'illuminated' || cat === 'letters3d' || cat === 'billboards' || cat === 'signage') {
+      return [
+        {
+          id: 0,
+          titleAr: 'استشارة الهوية والمسح الفني',
+          titleEn: 'Brand Consult & Mapping',
+          date: getRelDate(20),
+          duration: isAr ? 'يومان' : '2 Days',
+          statusAr: 'مكتمل ✓',
+          statusEn: 'Completed ✓',
+          descAr: 'معاينة الموقع ومراجعة زوايا الرؤية البصرية للجمهور ودراسة متطلبات التغذية الكهربائية والموافقات البلدية.',
+          descEn: 'On-site sightline analysis, ambient lux level analysis, municipal zoning checklist, and grid feed layout.',
+          teamAr: 'مدير الحسابات الفنية + مهندس معاينة',
+          teamEn: 'Tech Consultant + Site Surveyor',
+        },
+        {
+          id: 1,
+          titleAr: 'الهندسة وتصميم الإضاءة',
+          titleEn: 'Visual Layout & Lux Plan',
+          date: getRelDate(15),
+          duration: isAr ? '٣ أيام' : '3 Days',
+          statusAr: 'معتمد ✓',
+          statusEn: 'Approved ✓',
+          descAr: 'مطابقة ألوان الشعار الرسمية وتوزيع خلايا الـ LED لضمان إشعاع متساوٍ ومبهر وتجنب البقع المظلمة.',
+          descEn: 'Vector design adaptation, custom LED module cluster distribution layout for uniform illumination, and load budget.',
+          teamAr: 'مصمم خطوط وهويات هندسية',
+          teamEn: 'Signage Graphics Expert',
+        },
+        {
+          id: 2,
+          titleAr: 'قص الاستانلس والأكريليك',
+          titleEn: 'Laser Cutting & Forming',
+          date: getRelDate(9),
+          duration: isAr ? '٤ أيام' : '4 Days',
+          statusAr: 'منقوش ومطابق ✓',
+          statusEn: 'Laser Cut Approved ✓',
+          descAr: 'قص الألواح بليزر الألياف الضوئية الفائق وسحب وتشكيل الأكريليك الخالص المقاوم للاصفرار والحرارة.',
+          descEn: 'Precision fiber-laser cutting of heavy stainless steel faces and vacuum forming of ultra-pure non-yellowing PMMA acrylic.',
+          teamAr: 'مشغلو الليزر والتشكيل الحراري',
+          teamEn: 'Fiber Laser Operators',
+        },
+        {
+          id: 3,
+          titleAr: 'دمج الـ LED والتحميل الحراري',
+          titleEn: 'LED Wiring & Burn-in',
+          date: getRelDate(3),
+          duration: isAr ? 'يومان' : '2 Days',
+          statusAr: 'اجتاز فحص التشغيل ✓',
+          statusEn: '72hr Burn-In Passed ✓',
+          descAr: 'تركيب موديولات إضاءة سامسونج الكورية الأصلية بعزل IP67 المائي، وإجراء اختبار تشغيل مستمر لمدة 72 ساعة.',
+          descEn: 'Embedding Samsung original LED modules with IP67 potting, safe harness bundling, and continuous 72-hour stress-test.',
+          teamAr: 'تقني إلكترونيات وأنظمة تيار مستمر',
+          teamEn: 'DC Electronics Specialist',
+        },
+        {
+          id: 4,
+          titleAr: 'التركيب والاختبار الفعلي',
+          titleEn: 'Final Fit & Lux Calibration',
+          date: compDate,
+          duration: isAr ? 'يوم واحد' : '1 Day',
+          statusAr: 'مضاء وبأعلى سطوع ✓',
+          statusEn: 'Handed Over & Glowing ✓',
+          descAr: 'تركيب اللوحة الحرفية وتثبيتها بالجسور حديدية مخفية وتوصيلها بالمحولات وضبط تباين الألوان الخارجي.',
+          descEn: 'Mounting on heavy metal sub-chassis, main converter coupling, night lux-level calibration, and official client sign-off.',
+          teamAr: 'كبير مهندسي التركيبات الميدانية',
+          teamEn: 'Senior Field Lead & Crew',
+        },
+      ];
+    } else {
+      return [
+        {
+          id: 0,
+          titleAr: 'جلسة التخطيط وجمع المتطلبات',
+          titleEn: 'Strategy & Requirements Gathering',
+          date: getRelDate(25),
+          duration: isAr ? '٤ أيام' : '4 Days',
+          statusAr: 'تم الاعتماد ✓',
+          statusEn: 'Brief Approved ✓',
+          descAr: 'تحديد الهوية الفنية المستهدفة وتحليل متطلبات واجهات المستخدم وصياغة ميثاق العمل الفني المتكامل.',
+          descEn: 'Alignment of product roadmap, definition of targeted visual aesthetics, and comprehensive spec checklist signing.',
+          teamAr: 'مستشار العلامة ومحلل الأعمال',
+          teamEn: 'Brand Advisor + Business Analyst',
+        },
+        {
+          id: 1,
+          titleAr: 'هندسة التصميم وواجهات الاستخدام',
+          titleEn: 'UI/UX & High-Fi Design',
+          date: getRelDate(18),
+          duration: isAr ? '٥ أيام' : '5 Days',
+          statusAr: 'تم التوافق الرقمي ✓',
+          statusEn: 'Prototype Approved ✓',
+          descAr: 'تصميم النماذج التفاعلية وواجهات الاستخدام ومطابقتها للمعايير الجمالية مع اختبار التدفق التفاعلي وسلوك المستخدم.',
+          descEn: 'High-fidelity layout mockups, interactive prototyping, font scale tuning, and responsive interface architecture.',
+          teamAr: 'رئيس قسم تصميم الواجهات',
+          teamEn: 'Creative Director & Lead UX UI',
+        },
+        {
+          id: 2,
+          titleAr: 'التطوير البرمجي والإنتاج الكثيف',
+          titleEn: 'Product Production & Code',
+          date: getRelDate(10),
+          duration: isAr ? '٦ أيام' : '6 Days',
+          statusAr: 'تم التطوير بنجاح ✓',
+          statusEn: 'Production Ready ✓',
+          descAr: 'برمجة الواجهات والأنظمة المتكاملة أو طباعة الحزم الفاخرة وتجهيز الأصول بمواصفات دقة مطلقة.',
+          descEn: 'Modular robust front-end & back-end code integration or heavy luxury high-volume manufacturing with gold highlights.',
+          teamAr: 'كبير المطورين البرمجيين / الفنيين',
+          teamEn: 'Principal Tech Lead / Production Head',
+        },
+        {
+          id: 3,
+          titleAr: 'مراقبة الجودة والأمان',
+          titleEn: 'Rigorous Testing & QA',
+          date: getRelDate(4),
+          duration: isAr ? '٣ أيام' : '3 Days',
+          statusAr: 'خالٍ من العيوب والأخطاء ✓',
+          statusEn: 'Zero Defect Confirmed ✓',
+          descAr: 'مراجعة الأكواد ومقاومة الاختراق أو اختبار متانة الصناديق وثبات المطبوعات مع محاكاة ظروف الاستخدام الشديد.',
+          descEn: 'Systematic vulnerability scanning, screen responsive verification, or box structural crush & scratch resistance testing.',
+          teamAr: 'مهندس ضبط وضمان الجودة',
+          teamEn: 'Lead QA QC Specialist',
+        },
+        {
+          id: 4,
+          titleAr: 'التركيب والتدريب والتسليم',
+          titleEn: 'Deployment & Client Handover',
+          date: compDate,
+          duration: isAr ? 'يومان' : '2 Days',
+          statusAr: 'نشط ويعمل بكفاءة ✓',
+          statusEn: 'Live & Fully Operational ✓',
+          descAr: 'نشر النظام على السيرفرات السحابية أو تسليم شحنة المطبوعات الفاخرة للعميل مع تقديم أدلة الاستخدام والتشغيل والضمان.',
+          descEn: 'Secure Cloud server deployment, live-traffic stress benchmark setup, premium box dispatch, and full collateral handover.',
+          teamAr: 'مهندس العمليات والدعم الفني',
+          teamEn: 'DevOps Lead & Delivery Coordinator',
+        },
+      ];
+    }
+  };
+
   return (
     <div className="space-y-16 pb-16">
       
@@ -406,13 +869,28 @@ export default function Portfolio({
           
           {/* Header Actions */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gold-550/15">
-            <button 
-              onClick={handleCloseCaseStudy}
-              className="flex items-center gap-2 text-xs md:text-sm font-bold text-gold-505 hover:underline bg-neutral-950 px-4 py-2 rounded-lg border border-gold-505/15 self-start cursor-pointer transition-all duration-200 hover:border-gold-505/40"
-            >
-              <ArrowLeft className="w-4 h-4 shrink-0 rotate-180" />
-              <span>{isAr ? 'العودة لمعرض المشاريع الرئيسي' : 'Back to Main Portfolio'}</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button 
+                onClick={handleCloseCaseStudy}
+                className="flex items-center gap-2 text-xs md:text-sm font-bold text-gold-505 hover:underline bg-neutral-950 px-4 py-2 rounded-lg border border-gold-505/15 self-start cursor-pointer transition-all duration-200 hover:border-gold-505/40"
+              >
+                <ArrowLeft className="w-4 h-4 shrink-0 rotate-180" />
+                <span>{isAr ? 'العودة لمعرض المشاريع الرئيسي' : 'Back to Main Portfolio'}</span>
+              </button>
+
+              <button 
+                onClick={() => handleDownloadPDF(selectedProject)}
+                disabled={isDownloadingPDF}
+                className="flex items-center gap-2 text-xs md:text-sm font-bold text-neutral-950 bg-gradient-to-r from-gold-300 to-gold-505 hover:from-gold-200 hover:to-gold-300 disabled:opacity-50 px-4 py-2 rounded-lg transition-all duration-200 shadow-md cursor-pointer disabled:cursor-not-allowed"
+              >
+                {isDownloadingPDF ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                <span>{isDownloadingPDF ? (isAr ? 'جاري التحميل...' : 'Downloading...') : (isAr ? 'تحميل ملخص المشروع (PDF)' : 'Download PDF Summary')}</span>
+              </button>
+            </div>
             <div className="text-[11px] text-neutral-400 font-mono font-bold self-start sm:self-center flex items-center gap-1.5 direction-rtl">
               <Calendar className="w-4 h-4 text-gold-505" />
               <span>{isAr ? 'تاريخ الإنجاز:' : 'Completion date:'} {selectedProject.completionDate}</span>
@@ -499,6 +977,147 @@ export default function Portfolio({
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* PROJECT TIMELINE & MILESTONES JOURNEY */}
+          <div className="bg-neutral-950 p-6 sm:p-8 rounded-3xl border border-gold-505/15 space-y-8 mt-12">
+            
+            {/* Header section with branding */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gold-505/10 text-right">
+              <div>
+                <h3 className="text-lg md:text-xl font-extrabold text-white flex items-center gap-2 justify-end">
+                  <span>{isAr ? 'المخطط الزمني للمشروع ورحلة الإنجاز الميداني:' : 'Project Construction Timeline & Milestone Journey:'}</span>
+                  <Clock className="w-5 h-5 text-gold-505" />
+                </h3>
+                <p className="text-xs text-neutral-400 mt-1">
+                  {isAr 
+                    ? 'انقر فوق أي مرحلة لاستكشاف تفاصيل البناء الهندسي، فرق العمل، والتواريخ المعتمدة.' 
+                    : 'Click any phase below to explore engineering details, worklogs, dates, and dedicated crew.'}
+                </p>
+              </div>
+              <span className="text-[10px] font-mono font-bold bg-gold-950 text-gold-300 py-1.5 px-3 rounded border border-gold-505/20 self-start md:self-center">
+                {isAr ? 'منظومة جودة معتمدة ✓' : 'CERTIFIED YAFTA PIPELINE ✓'}
+              </span>
+            </div>
+
+            {/* The Visual Timeline Track */}
+            <div className="relative py-4 px-2">
+              {/* Desktop Horizontal Line Connectors */}
+              <div className="absolute top-[28px] left-[10%] right-[10%] h-0.5 bg-neutral-800 hidden md:block z-0">
+                <div className="absolute inset-0 bg-gradient-to-r from-gold-505 to-gold-300 w-full" />
+              </div>
+
+              {/* Steps container */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-2 relative z-10">
+                {getProjectMilestones(selectedProject).map((milestone, idx) => {
+                  const isSelected = activeTimelineStep === idx;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setActiveTimelineStep(idx)}
+                      className={`flex flex-col items-center p-3 md:p-2 rounded-xl border transition-all duration-300 text-center cursor-pointer ${
+                        isSelected 
+                          ? 'bg-gradient-to-b from-neutral-900 to-neutral-950 border-gold-505 shadow-lg shadow-gold-505/5 scale-103' 
+                          : 'bg-transparent border-neutral-800/80 hover:border-neutral-700 hover:bg-neutral-900/30'
+                      }`}
+                    >
+                      {/* Step Bubble/Icon Container */}
+                      <div className="relative flex items-center justify-center mb-2.5">
+                        {/* Selected Ripple/Pulse Glow */}
+                        {isSelected && (
+                          <span className="absolute -inset-1 rounded-full bg-gold-505/20 animate-ping" />
+                        )}
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-mono text-xs font-black transition-all duration-300 ${
+                          isSelected 
+                            ? 'bg-gold-505 text-neutral-950 shadow-md shadow-gold-505/30' 
+                            : 'bg-neutral-900 text-gold-300 border border-gold-505/30'
+                        }`}>
+                          {idx + 1}
+                        </div>
+                      </div>
+
+                      {/* Title & Short Details */}
+                      <span className={`text-[11px] md:text-xs font-extrabold tracking-tight block transition-colors duration-300 ${
+                        isSelected ? 'text-gold-300' : 'text-neutral-300'
+                      }`}>
+                        {isAr ? milestone.titleAr : milestone.titleEn}
+                      </span>
+                      
+                      <span className="text-[9px] font-mono text-neutral-500 font-bold block mt-1">
+                        {milestone.date || (isAr ? 'مرحلة البناء' : 'Build Phase')}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Active Step Details Panel */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTimelineStep}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.25 }}
+                className="bg-neutral-900/50 p-5 md:p-6 rounded-2xl border border-gold-505/10 grid grid-cols-1 md:grid-cols-3 gap-6 text-right font-sans"
+              >
+                {/* Milestone Details & Text (2 cols on desktop) */}
+                <div className="md:col-span-2 space-y-4">
+                  <div className="flex flex-wrap items-center gap-3 justify-end">
+                    <span className="text-xs bg-green-950/60 border border-green-505/30 text-green-300 font-bold py-1 px-2.5 rounded-full flex items-center gap-1.5 order-2">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>{getProjectMilestones(selectedProject)[activeTimelineStep]?.statusAr}</span>
+                    </span>
+                    <h4 className="text-base md:text-lg font-black text-white order-1">
+                      {isAr ? getProjectMilestones(selectedProject)[activeTimelineStep]?.titleAr : getProjectMilestones(selectedProject)[activeTimelineStep]?.titleEn}
+                    </h4>
+                  </div>
+
+                  <p className="text-xs md:text-sm text-neutral-300 leading-relaxed font-normal whitespace-pre-line">
+                    {isAr ? getProjectMilestones(selectedProject)[activeTimelineStep]?.descAr : getProjectMilestones(selectedProject)[activeTimelineStep]?.descEn}
+                  </p>
+                </div>
+
+                {/* Logistics & Metrics Box (1 col on desktop) */}
+                <div className="bg-neutral-950/80 p-4 rounded-xl border border-neutral-800 space-y-3.5">
+                  <h5 className="text-[10px] font-black tracking-widest text-gold-300 uppercase pb-1 border-b border-neutral-800 font-mono">
+                    {isAr ? 'بيانات المسار واللوجستيات' : 'METRICS & LOGISTICS'}
+                  </h5>
+                  
+                  {/* Metric: Date */}
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-neutral-200 font-bold font-mono">
+                      {getProjectMilestones(selectedProject)[activeTimelineStep]?.date}
+                    </span>
+                    <span className="text-neutral-500 font-medium">
+                      {isAr ? 'تاريخ التنفيذ:' : 'Execution Date:'}
+                    </span>
+                  </div>
+
+                  {/* Metric: Duration */}
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-neutral-200 font-bold font-mono">
+                      {getProjectMilestones(selectedProject)[activeTimelineStep]?.duration}
+                    </span>
+                    <span className="text-neutral-500 font-medium">
+                      {isAr ? 'المدة المستغرقة:' : 'Phase Duration:'}
+                    </span>
+                  </div>
+
+                  {/* Metric: Team */}
+                  <div className="pt-2 border-t border-neutral-800/60 space-y-1.5">
+                    <div className="flex items-center gap-1.5 justify-end text-neutral-500 text-[10px] font-bold">
+                      <span>{isAr ? 'الفريق المسؤول عن المهمة:' : 'DEDICATED CREW / TEAM:'}</span>
+                      <Users className="w-3.5 h-3.5 text-gold-505" />
+                    </div>
+                    <span className="text-xs text-gold-300 font-bold block leading-snug">
+                      {isAr ? getProjectMilestones(selectedProject)[activeTimelineStep]?.teamAr : getProjectMilestones(selectedProject)[activeTimelineStep]?.teamEn}
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
           </div>
 
           {/* Interactive Before/After reveal on actual project inside study! */}

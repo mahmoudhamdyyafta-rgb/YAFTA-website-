@@ -12,6 +12,11 @@ import ExperienceStudio from './components/ExperienceStudio';
 import IntroAnimation from './components/IntroAnimation';
 import GoldParticles from './components/GoldParticles';
 
+// Firebase & Firestore integration
+import { db, storage, isFirebaseConfigured } from './firebaseConfig';
+import { doc, setDoc, onSnapshot, collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
 // Pages
 import Home from './pages/Home';
 import Services from './pages/Services';
@@ -23,6 +28,8 @@ import Digital from './pages/Digital';
 import ClientPortal from './pages/ClientPortal';
 import About from './pages/About';
 import Contact from './pages/Contact';
+import TrackRepair from './pages/TrackRepair';
+import Offers from './pages/Offers';
 
 // Central Data & Types
 import { 
@@ -35,6 +42,7 @@ import {
 } from './data';
 import { PageId, Project, CompanyInfo, ServiceDetail, BeforeAfterItem, Testimonial, LogoConfig, UserAccount } from './types';
 import LogoRenderer from './components/LogoRenderer';
+import WhatsAppButton, { WhatsAppConfig, WhatsAppDepartment } from './components/WhatsAppButton';
 
 // Icons
 import { 
@@ -44,7 +52,7 @@ import {
   CheckCircle2, ListTodo, Globe, Activity, HardDriveDownload, UserCheck, Inbox, 
   Eye, ShieldCheck, Mail, Phone, MapPin, Calculator, PlusCircle, Check, HelpCircle,
   ExternalLink, Lock, Shield, Server, FileText, Share2, Compass, Cpu, AlertCircle, Heart,
-  Sparkles, Home as HomeIcon
+  Sparkles, Home as HomeIcon, Clock, History, Upload
 } from 'lucide-react';
 
 export default function App() {
@@ -77,6 +85,12 @@ export default function App() {
   const [activeAdminTab, setActiveAdminTab] = useState<string>('dashboard');
   const [adminSearchQuery, setAdminSearchQuery] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeAdminTab === 'dashboard') {
+      fetchVersionHistory();
+    }
+  }, [activeAdminTab]);
 
   // 1. Company Information Settings
   const [companyDetails, setCompanyDetails] = useState<CompanyInfo>(() => {
@@ -330,6 +344,8 @@ export default function App() {
     visibleInHero: true,
     visibleInFooter: true,
     visibleInMenu: true,
+    visibleInIntro: true,
+    visibleInHeroStart: true,
     animation: 'none',
     hoverEffect: 'scale',
     scrollEffect: 'none',
@@ -340,17 +356,78 @@ export default function App() {
     return saved ? JSON.parse(saved) : DEFAULT_LOGO_CONFIG;
   });
 
+  const DEFAULT_WHATSAPP_CONFIG: WhatsAppConfig = {
+    number: '201116210464',
+    position: 'bottom-right',
+    color: '#25D366',
+    text: 'تواصل معنا',
+    enabled: true,
+    greetingMessage: 'مرحباً بك في يافطة! كيف يمكننا مساعدتك اليوم في تصميم لوحتك الإعلانية؟',
+    showWelcomeTrigger: true,
+    welcomeTriggerTextAr: 'مرحباً بك! لدينا فريق متخصص لمساعدتك في تصميم وتصنيع لافتاتك الإعلانية بأفضل سعر وعروض حصرية تصل إلى ٣٠٪.',
+    welcomeTriggerTextEn: 'Welcome! We have a specialized team ready to design and fabricate your custom signs with exclusive 30% discounts.',
+    welcomeTriggerDelay: 4,
+    departments: [
+      {
+        id: 'sales',
+        nameAr: 'المبيعات والتعاقدات 💼',
+        nameEn: 'Sales & Contracts 💼',
+        descriptionAr: 'لطلب عروض أسعار وتصميم اللوحات الإعلانية والواجهات',
+        descriptionEn: 'Get custom quotes and professional cladding/sign designs',
+        number: '201116210464',
+        greetingMessage: 'مرحباً بقسم المبيعات، أود الاستفسار عن تفاصيل أسعار وعروض لوحات يافطة للواجهات والكلادينج.',
+        isOnline: true
+      },
+      {
+        id: 'maintenance',
+        nameAr: 'الصيانة والدعم الفني 🛠️',
+        nameEn: 'Signage Maintenance & Support 🛠️',
+        descriptionAr: 'لمتابعة طلبات صيانة اللوحات والأعطال الطارئة والضمان',
+        descriptionEn: 'Follow up on hardware repairs and active warranty status',
+        number: '201116210464',
+        greetingMessage: 'مرحباً بقسم الصيانة، أود تقديم طلب فحص/صيانة للافتة الخاصة بي.',
+        isOnline: true
+      },
+      {
+        id: 'production',
+        nameAr: 'إدارة الإنتاج والورشة 🏭',
+        nameEn: 'Production & Workshop 🏭',
+        descriptionAr: 'لمتابعة تقدم تصنيع واجهات الكلادينج واللوحات المضيئة',
+        descriptionEn: 'Track cladding fabrication and custom signage workshop progress',
+        number: '201116210464',
+        greetingMessage: 'مرحباً بإدارة الإنتاج، أود متابعة حالة تصنيع مشروعي القائم لدى ورشتكم.',
+        isOnline: true
+      }
+    ]
+  };
+
+  const [whatsAppConfig, setWhatsAppConfig] = useState<WhatsAppConfig>(() => {
+    const saved = localStorage.getItem('yafta_whatsapp_config');
+    return saved ? JSON.parse(saved) : DEFAULT_WHATSAPP_CONFIG;
+  });
+
   const [logoHistory, setLogoHistory] = useState<{ undo: LogoConfig[], redo: LogoConfig[] }>({
     undo: [],
     redo: [],
   });
+
+  // ════════════════════════════════════════════════════
+  // FIRESTORE PERSISTENCE SYSTEM FOR ADMIN DASHBOARD
+  // ════════════════════════════════════════════════════
+  const [autoSave, setAutoSave] = useState<boolean>(true);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [versionHistory, setVersionHistory] = useState<any[]>([]);
+  const [isLoadingVersions, setIsLoadingVersions] = useState<boolean>(false);
+
+  const lastKnownServerState = useRef<any>(null);
+  const isIncomingFirestoreUpdate = useRef<boolean>(false);
 
   // Safe activity log entry maker with functional state updater (prevents stale closure & infinite loops)
   const addActivity = (text: string) => {
     const timeStr = new Date().toLocaleTimeString();
     setActivityLogs((prev) => {
       const newLogs = [{ time: timeStr, text }, ...prev.slice(0, 50)];
-      localStorage.setItem('yafta_activity_logs', JSON.stringify(newLogs));
       return newLogs;
     });
   };
@@ -359,21 +436,293 @@ export default function App() {
   const [isSynced, setIsSynced] = useState<boolean>(true);
   const isSyncingInit = useRef(true);
 
+  // Helper to fetch the complete snapshot of current local states
+  const getFullConfigSnapshot = () => {
+    return {
+      companyDetails,
+      projectsList,
+      servicesList,
+      statisticsCounters,
+      beforeAfterItems,
+      customContent,
+      testimonialsList,
+      submittedInquiries,
+      mediaFiles,
+      teamMembers,
+      selectedGoldTheme,
+      experienceConfig,
+      seoMeta,
+      blogArticles,
+      adminUsers,
+      logoConfig,
+      activityLogs,
+      whatsAppConfig
+    };
+  };
+
+  // Helper to bootstrap Firebase Firestore data with defaults if siteSettings/global doesn't exist
+  const bootstrapFirebaseData = async () => {
+    if (!isFirebaseConfigured || !db) return;
+    try {
+      const docRef = doc(db, 'siteSettings', 'global');
+      const initialPayload = {
+        companyDetails: COMPANY_DETAILS,
+        projectsList: PROJECTS_DATA,
+        servicesList: SERVICE_DETAILS,
+        statisticsCounters: STATISTICS_COUNTERS,
+        beforeAfterItems: BEFORE_AFTER_DATA,
+        customContent: {
+          heroTitleAr: 'أعمالنا تتحدث عن جودة ما نقدمه',
+          heroTitleEn: 'Our Actions Speak for Precision Quality',
+          heroDescAr: 'مجموعة مختارة من المشاريع الهندسية والإنشائية التي نفذتها يافطة باحترافية كاملة في مجالات الهوية البصرية، اللافتات ثلاثية الأبعاد، واجهات الكلادينج، المطبوعات والحلول الرقمية الرائدة.',
+          heroDescEn: 'A curated catalog of premium architectural facades, high-end 3D LED storefronts, precision packaging, and futuristic digital systems completed for Egypt’s finest brands.',
+          aboutSummaryAr: 'يافطة هي الشريك الحصري الموثوق لتصميم وتصنيع كبرى اللافتات ثلاثية الأبعاد وواجهات الكلادينج المبتكرة وفقاً لأقصى المعايير الهندسية والأمان بضمان حقيقي يدوم طويلاً.',
+          aboutSummaryEn: 'YAFTA serves as the premier engineering partner for heavy structural signage, and ultra-durable cladding systems built under wind-calculated structural guidelines.'
+        },
+        testimonialsList: TESTIMONIALS_DATA,
+        submittedInquiries: [
+          {
+            id: 1,
+            name: 'إكرامي الهواري',
+            phone: '01112210464',
+            email: 'ekramy@mado-egypt.com',
+            company: 'سلسلة حلويات مادو مصر',
+            message: 'نريد تصميم وتركيب واجهة كلادينج إضافية مع لافتة أكريليك مفرغ مضيء لفرع التجمع الجديد بمساحة 80 متر مربع.',
+            category: 'Contact Form Message',
+            estimate: 144000,
+            date: '18/06/2026, 02:44 PM',
+            status: 'معلق'
+          },
+          {
+            id: 2,
+            name: 'مشتريات شركة إعمار مصر',
+            phone: '01019082716',
+            email: 'contracts@emaar.ae',
+            company: 'إعمار مصر العقارية',
+            message: 'طلب عرض سعر متكامل لتصنيع اللوحات الإرشادية لـ 15 فيلا ومبنى إداري بمشروع القاهرة الجديدة.',
+            category: 'لافتات وحروف',
+            estimate: 880000,
+            date: '17/06/2026, 11:15 AM',
+            status: 'تم الرد'
+          }
+        ],
+        mediaFiles: [
+          { id: '1', name: 'facade_mado_assembly.webp', size: '1.2 MB', dimensions: '1920x1080', format: 'WebP', url: 'https://images.unsplash.com/photo-1540340061722-9293d5163008?q=80&w=800' },
+          { id: '2', name: '3d_letters_neon_flex.webp', size: '840 KB', dimensions: '1200x1200', format: 'WebP', url: 'https://images.unsplash.com/photo-1508962914676-134849a727f0?q=80&w=800' },
+          { id: '3', name: 'rigid_boxes_packaging.webp', size: '1.4 MB', dimensions: '1600x1200', format: 'WebP', url: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?q=80&w=800' },
+          { id: '4', name: 'company_profile_2026.pdf', size: '14.2 MB', dimensions: 'N/A', format: 'PDF Document', url: '#' },
+          { id: '5', name: 'laser_cutting_line_vlog.mp4', size: '38.4 MB', dimensions: '1080p', format: 'MP4 Video', url: '#' }
+        ],
+        teamMembers: [
+          { id: '1', nameAr: 'المصمم إسلام حمدي', nameEn: 'Islam Hamdy', positionAr: 'المدير الإبداعي ومصمم المحاكاة ثلاثية الأبعاد', positionEn: 'Creative Director & 3D Visualizer', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150', notes: 'خبير في تنسيق الضوء والظلال ومحاكاة النهار والليل للافتات' },
+          { id: '2', nameAr: 'الأستاذ إبراهيم فاروق', nameEn: 'Ibrahim Farouk', positionAr: 'رئيس ورشة التصنيع الميكانيكي ومبرمج CNC', positionEn: 'Head of Mechanical Workshop & CNC Programmer', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150', notes: 'يضمن تقفيل الاستانلس ولحام الأرجون بدون أي عيوب أو حواف حادة' },
+          { id: '3', nameAr: 'المهندس شريف عبد الوهاب', nameEn: 'Sherif Abdel Wahab', positionAr: 'كبير مهندسي التركيبات الشاهقة وسلامة المواقع', positionEn: 'Lead Rigger & Safety Engineer', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=150', notes: 'يشرف على الأوناش وتوزيع الأحمال لتفادي اهتزاز اللافتات مع الرياح' }
+        ],
+        selectedGoldTheme: 'champagne',
+        experienceConfig: DEFAULT_EXPERIENCE_CONFIG,
+        seoMeta: {
+          title: 'يافطة للدعاية والإعلان | لافتات LED وكلادينج بالشرق الأوسط',
+          description: 'الشركة الرائدة في تصنيع كبرى اللافتات ثلاثية الأبعاد والواجهات التجارية وألواح الكلادينج المقاومة للحريق في جمهورية مصر العربية بضمان 10 سنوات.',
+          keywords: 'يافطة, دعاية وإعلان, كلادينج بمصر, حروف بارزة, لافتات مضيئة, ليد سامسونج كوري, واجهات تجارية, مطبوعات علب',
+          robots: 'index, follow',
+          sitemapUrl: 'https://www.yafta-adv.com/sitemap.xml'
+        },
+        blogArticles: [
+          { id: '1', titleAr: 'أهمية حساب مقاومة الرياح عند تركيب واجهات الكلادينج العالية', titleEn: 'Evaluating Wind Loads on Skyscraper Cladding', category: 'هندسة ودراسات', date: '19/06/2026', tags: ['كلادينج', 'سلامة'] },
+          { id: '2', titleAr: 'مقارنة الاستانلس ستيل عيار 304 والعيارات المقلدة في لافتات الشوارع', titleEn: 'Stainless Steel 304 vs Fake Alloys in Signboards', category: 'خامات ومواد', date: '15/06/2026', tags: ['ستانلس', 'جودة'] },
+          { id: '3', titleAr: 'تأثير الإضاءة الخلفية الهالة (Halo Backlit) على جذب المارة للمتاجر الفاخرة', titleEn: 'Psychology of Halo Lighting in Premium Reseller Stores', category: 'تصاميم إبداعية', date: '10/06/2026', tags: ['إضاءة', 'دعاية'] }
+        ],
+        adminUsers: [
+          { username: 'admin', role: 'المالك المشرف (Superadmin)', email: 'islamhamdypro@gmail.com', lastLogin: 'اليوم، 09:30 AM' },
+          { username: 'editor1', role: 'محرر ميديا متميز (Senior Editor)', email: 'yaftagroupadv@gmail.com', lastLogin: 'أمس، 05:40 PM' }
+        ],
+        logoConfig: DEFAULT_LOGO_CONFIG,
+        whatsAppConfig: DEFAULT_WHATSAPP_CONFIG,
+        activityLogs: [
+          { time: '09:41:10 AM', text: 'تم بدء جلسة التحكم الآمنة بصلاحيات مالك الموقع' },
+          { time: '09:12:05 AM', text: 'فحص الحماية الأمنية لجدران الحماية: سليم (100%)' },
+          { time: '08:00:00 AM', text: 'توليد تلقائي لخرائط الأرشفة sitemap.xml بنجاح' }
+        ]
+      };
+      await setDoc(docRef, initialPayload);
+      lastKnownServerState.current = initialPayload;
+      console.log('Firebase data bootstrapped successfully.');
+    } catch (error) {
+      console.error('Error bootstrapping Firebase data:', error);
+    }
+  };
+
+  // Helper to save version snapshot of what was edited
+  const saveVersionSnapshot = async (changedFields: any) => {
+    if (!isFirebaseConfigured || !db) return;
+    try {
+      const historyCollectionRef = collection(db, 'settingsVersions');
+      const timestamp = new Date().toISOString();
+      const userStr = currentUser?.username || 'admin';
+      const changedKeys = Object.keys(changedFields);
+      if (changedKeys.length === 0) return;
+
+      await addDoc(historyCollectionRef, {
+        timestamp,
+        author: userStr,
+        changedKeys,
+        descriptionAr: `تعديل تلقائي/يدوي للحقول: ${changedKeys.join(', ')}`,
+        descriptionEn: `Updated fields: ${changedKeys.join(', ')}`,
+        config: getFullConfigSnapshot()
+      });
+    } catch (e) {
+      console.warn('Could not save version snapshot:', e);
+    }
+  };
+
+  // Core Firestore Save implementation with Optimistic UI rollback support
+  const saveToFirestore = async (updatedFields: Partial<any>, rollbackFn?: () => void) => {
+    if (!isFirebaseConfigured || !db) return;
+    setIsSyncing(true);
+    try {
+      const docRef = doc(db, 'siteSettings', 'global');
+      await setDoc(docRef, updatedFields, { merge: true });
+      
+      // Update our last known state with successfully saved fields
+      lastKnownServerState.current = {
+        ...lastKnownServerState.current,
+        ...updatedFields
+      };
+
+      // Write snapshot to history
+      await saveVersionSnapshot(updatedFields);
+
+      setIsSynced(true);
+      setHasUnsavedChanges(false);
+    } catch (err) {
+      console.error("Firestore save failed:", err);
+      setIsSynced(false);
+      if (rollbackFn) rollbackFn();
+      triggerToast(isAr ? '❌ فشل الاتصال بقاعدة البيانات السحابية. تم التراجع تلقائياً.' : '❌ Failed to connect to cloud database. Changes rolled back.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Real-time listener for siteSettings/global
   useEffect(() => {
+    if (!isFirebaseConfigured || !db) {
+      console.log('Firebase not configured. Running in local fallback mode.');
+      return;
+    }
+
+    const docRef = doc(db, 'siteSettings', 'global');
+    
+    const unsub = onSnapshot(docRef, (snapshot) => {
+      isIncomingFirestoreUpdate.current = true;
+      
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        lastKnownServerState.current = data;
+
+        // Apply fields to React states in real time
+        if (data.companyDetails) setCompanyDetails(data.companyDetails);
+        if (data.projectsList) setProjectsList(data.projectsList);
+        if (data.servicesList) setServicesList(data.servicesList);
+        if (data.statisticsCounters) setStatisticsCounters(data.statisticsCounters);
+        if (data.beforeAfterItems) setBeforeAfterItems(data.beforeAfterItems);
+        if (data.customContent) setCustomContent(data.customContent);
+        if (data.testimonialsList) setTestimonialsList(data.testimonialsList);
+        if (data.submittedInquiries) setSubmittedInquiries(data.submittedInquiries);
+        if (data.mediaFiles) setMediaFiles(data.mediaFiles);
+        if (data.teamMembers) setTeamMembers(data.teamMembers);
+        if (data.selectedGoldTheme) setSelectedGoldTheme(data.selectedGoldTheme);
+        if (data.experienceConfig) setExperienceConfig(data.experienceConfig);
+        if (data.seoMeta) setSeoMeta(data.seoMeta);
+        if (data.blogArticles) setBlogArticles(data.blogArticles);
+        if (data.adminUsers) setAdminUsers(data.adminUsers);
+        if (data.logoConfig) setLogoConfig(data.logoConfig);
+        if (data.whatsAppConfig) setWhatsAppConfig(data.whatsAppConfig);
+        if (data.activityLogs) setActivityLogs(data.activityLogs);
+
+        setIsSynced(true);
+      } else {
+        // Document does not exist, let's bootstrap it!
+        bootstrapFirebaseData();
+      }
+
+      // Allow a small delay for React states to batch update before releasing lock
+      setTimeout(() => {
+        isIncomingFirestoreUpdate.current = false;
+      }, 50);
+    }, (error) => {
+      console.error("Firestore onSnapshot error:", error);
+      isIncomingFirestoreUpdate.current = false;
+    });
+
+    return () => unsub();
+  }, [db, isFirebaseConfigured]);
+
+  // Sync state changes back to Firestore (handles debounce & optimistic/rollback)
+  useEffect(() => {
+    if (isIncomingFirestoreUpdate.current) return;
     if (isSyncingInit.current) {
       isSyncingInit.current = false;
       return;
     }
-    setIsSynced(false);
-    const handler = setTimeout(() => {
+
+    const currentSnapshot = getFullConfigSnapshot();
+    const lastServerSnapshot = lastKnownServerState.current || {};
+
+    const changedFields: any = {};
+    let hasChanges = false;
+
+    Object.keys(currentSnapshot).forEach((key) => {
+      const curVal = (currentSnapshot as any)[key];
+      const prevVal = lastServerSnapshot[key];
+
+      if (JSON.stringify(curVal) !== JSON.stringify(prevVal)) {
+        changedFields[key] = curVal;
+        hasChanges = true;
+      }
+    });
+
+    if (hasChanges) {
+      if (autoSave) {
+        setIsSynced(false);
+        const debounceTimer = setTimeout(() => {
+          const rollbackSnapshot = { ...lastServerSnapshot };
+          
+          saveToFirestore(changedFields, () => {
+            // Rollback to previous known healthy server state
+            isIncomingFirestoreUpdate.current = true;
+            if (rollbackSnapshot.companyDetails) setCompanyDetails(rollbackSnapshot.companyDetails);
+            if (rollbackSnapshot.projectsList) setProjectsList(rollbackSnapshot.projectsList);
+            if (rollbackSnapshot.servicesList) setServicesList(rollbackSnapshot.servicesList);
+            if (rollbackSnapshot.statisticsCounters) setStatisticsCounters(rollbackSnapshot.statisticsCounters);
+            if (rollbackSnapshot.beforeAfterItems) setBeforeAfterItems(rollbackSnapshot.beforeAfterItems);
+            if (rollbackSnapshot.customContent) setCustomContent(rollbackSnapshot.customContent);
+            if (rollbackSnapshot.testimonialsList) setTestimonialsList(rollbackSnapshot.testimonialsList);
+            if (rollbackSnapshot.submittedInquiries) setSubmittedInquiries(rollbackSnapshot.submittedInquiries);
+            if (rollbackSnapshot.mediaFiles) setMediaFiles(rollbackSnapshot.mediaFiles);
+            if (rollbackSnapshot.teamMembers) setTeamMembers(rollbackSnapshot.teamMembers);
+            if (rollbackSnapshot.selectedGoldTheme) setSelectedGoldTheme(rollbackSnapshot.selectedGoldTheme);
+            if (rollbackSnapshot.experienceConfig) setExperienceConfig(rollbackSnapshot.experienceConfig);
+            if (rollbackSnapshot.seoMeta) setSeoMeta(rollbackSnapshot.seoMeta);
+            if (rollbackSnapshot.blogArticles) setBlogArticles(rollbackSnapshot.blogArticles);
+            if (rollbackSnapshot.adminUsers) setAdminUsers(rollbackSnapshot.adminUsers);
+            if (rollbackSnapshot.logoConfig) setLogoConfig(rollbackSnapshot.logoConfig);
+            if (rollbackSnapshot.whatsAppConfig) setWhatsAppConfig(rollbackSnapshot.whatsAppConfig);
+            if (rollbackSnapshot.activityLogs) setActivityLogs(rollbackSnapshot.activityLogs);
+            setTimeout(() => {
+              isIncomingFirestoreUpdate.current = false;
+            }, 50);
+          });
+        }, 1000); // 1-second debounce to prevent write spam
+        return () => clearTimeout(debounceTimer);
+      } else {
+        setHasUnsavedChanges(true);
+        setIsSynced(false);
+      }
+    } else {
+      setHasUnsavedChanges(false);
       setIsSynced(true);
-      const timestamp = new Date().toLocaleTimeString();
-      addActivity(isAr 
-        ? `[${timestamp}] تم بنجاح حوسبة ومزامنة البيانات في الذاكرة المحلية الآمنة` 
-        : `[${timestamp}] State fully synchronized and saved to localStorage audit trace.`
-      );
-    }, 600);
-    return () => clearTimeout(handler);
+    }
   }, [
     companyDetails,
     projectsList,
@@ -385,24 +734,113 @@ export default function App() {
     submittedInquiries,
     mediaFiles,
     teamMembers,
-    blogArticles,
-    adminUsers,
-    isAr,
-    logoConfig,
+    selectedGoldTheme,
     experienceConfig,
     seoMeta,
-    selectedGoldTheme
+    blogArticles,
+    adminUsers,
+    logoConfig,
+    whatsAppConfig,
+    activityLogs,
+    autoSave
   ]);
+
+  // Trigger manual save of outstanding modifications to Firestore
+  const handleManualSave = async () => {
+    const currentSnapshot = getFullConfigSnapshot();
+    const lastServerSnapshot = lastKnownServerState.current || {};
+
+    const changedFields: any = {};
+    let hasChanges = false;
+
+    Object.keys(currentSnapshot).forEach((key) => {
+      const curVal = (currentSnapshot as any)[key];
+      const prevVal = lastServerSnapshot[key];
+
+      if (JSON.stringify(curVal) !== JSON.stringify(prevVal)) {
+        changedFields[key] = curVal;
+        hasChanges = true;
+      }
+    });
+
+    if (!hasChanges) {
+      triggerToast(isAr ? 'كل التعديلات محفوظة بالفعل في السحابة! ✅' : 'All modifications are already saved! ✅');
+      return;
+    }
+
+    const rollbackSnapshot = { ...lastServerSnapshot };
+
+    await saveToFirestore(changedFields, () => {
+      isIncomingFirestoreUpdate.current = true;
+      if (rollbackSnapshot.companyDetails) setCompanyDetails(rollbackSnapshot.companyDetails);
+      if (rollbackSnapshot.projectsList) setProjectsList(rollbackSnapshot.projectsList);
+      if (rollbackSnapshot.servicesList) setServicesList(rollbackSnapshot.servicesList);
+      if (rollbackSnapshot.statisticsCounters) setStatisticsCounters(rollbackSnapshot.statisticsCounters);
+      if (rollbackSnapshot.beforeAfterItems) setBeforeAfterItems(rollbackSnapshot.beforeAfterItems);
+      if (rollbackSnapshot.customContent) setCustomContent(rollbackSnapshot.customContent);
+      if (rollbackSnapshot.testimonialsList) setTestimonialsList(rollbackSnapshot.testimonialsList);
+      if (rollbackSnapshot.submittedInquiries) setSubmittedInquiries(rollbackSnapshot.submittedInquiries);
+      if (rollbackSnapshot.mediaFiles) setMediaFiles(rollbackSnapshot.mediaFiles);
+      if (rollbackSnapshot.teamMembers) setTeamMembers(rollbackSnapshot.teamMembers);
+      if (rollbackSnapshot.selectedGoldTheme) setSelectedGoldTheme(rollbackSnapshot.selectedGoldTheme);
+      if (rollbackSnapshot.experienceConfig) setExperienceConfig(rollbackSnapshot.experienceConfig);
+      if (rollbackSnapshot.seoMeta) setSeoMeta(rollbackSnapshot.seoMeta);
+      if (rollbackSnapshot.blogArticles) setBlogArticles(rollbackSnapshot.blogArticles);
+      if (rollbackSnapshot.adminUsers) setAdminUsers(rollbackSnapshot.adminUsers);
+      if (rollbackSnapshot.logoConfig) setLogoConfig(rollbackSnapshot.logoConfig);
+      if (rollbackSnapshot.activityLogs) setActivityLogs(rollbackSnapshot.activityLogs);
+      setTimeout(() => {
+        isIncomingFirestoreUpdate.current = false;
+      }, 50);
+    });
+
+    triggerToast(isAr ? 'تم حفظ التعديلات يدوياً بنجاح! 💾' : 'All updates have been manually saved to Cloud! 💾');
+  };
+
+  // Safe Logo Storage Uploader
+  const uploadLogoFile = async (file: File, mode: 'dark' | 'light') => {
+    if (!isFirebaseConfigured || !storage) {
+      // FileReader fallback if no storage active
+      const r = new FileReader();
+      r.onload = () => {
+        updateLogoConfig({ ...logoConfig, [mode === 'dark' ? 'imageSrcDark' : 'imageSrcLight']: r.result as string });
+        addActivity(`تحميل شعار ${mode === 'dark' ? 'داكن' : 'مضيء'} محلياً`);
+        triggerToast(isAr ? 'تم تحميل الشعار محلياً' : 'Loaded local image preview');
+      };
+      r.readAsDataURL(file);
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const storageRef = ref(storage, `logos/${Date.now()}_${file.name}`);
+      const uploadResult = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(uploadResult.ref);
+      
+      const updatedLogoConfig = {
+        ...logoConfig,
+        [mode === 'dark' ? 'imageSrcDark' : 'imageSrcLight']: downloadURL
+      };
+
+      updateLogoConfig(updatedLogoConfig);
+      triggerToast(isAr ? 'تم رفع الشعار وحفظه بنجاح على السحابة! ☁️' : 'Logo successfully uploaded to Cloud Storage! ☁️');
+      addActivity(`تم رفع شعار ${mode === 'dark' ? 'داكن' : 'مضيء'} بنجاح: ${file.name}`);
+    } catch (error) {
+      console.error("Firebase Storage Upload failed:", error);
+      triggerToast(isAr ? '❌ فشل رفع الشعار إلى سحابة التخزين.' : '❌ Failed to upload logo to Cloud Storage.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const updateLogoConfig = (newConfig: LogoConfig, recordHistory = true) => {
     if (recordHistory) {
       setLogoHistory(prev => ({
-        undo: [...prev.undo.slice(-19), logoConfig], // max 20 levels
+        undo: [...prev.undo.slice(-19), logoConfig],
         redo: []
       }));
     }
     setLogoConfig(newConfig);
-    localStorage.setItem('yafta_logo_config', JSON.stringify(newConfig));
   };
 
   const handleLogoUndo = () => {
@@ -415,7 +853,6 @@ export default function App() {
       redo: [...logoHistory.redo, logoConfig]
     });
     setLogoConfig(previous);
-    localStorage.setItem('yafta_logo_config', JSON.stringify(previous));
     triggerToast(isAr ? 'تم التراجع عن آخر تعديل للشعار ↩️' : 'Logo action undone ↩️');
   };
 
@@ -429,7 +866,6 @@ export default function App() {
       redo: newRedo
     });
     setLogoConfig(next);
-    localStorage.setItem('yafta_logo_config', JSON.stringify(next));
     triggerToast(isAr ? 'تم إعادة تطبيق التعديل المتراجع عنه 🔄' : 'Logo action redone 🔄');
   };
 
@@ -441,14 +877,79 @@ export default function App() {
     }, 3000);
   };
 
-  // addActivity is hoisted above the synchronization tracking useEffect to prevent execution order conflicts
-
   // Safe save configurations
   const saveCompanyDetails = (details: CompanyInfo) => {
     setCompanyDetails(details);
-    localStorage.setItem('yafta_company_details', JSON.stringify(details));
-    triggerToast('تم فورا حفظ وتحديث بيانات الاتصال والشركة في كامل طبقات الموقع! 💾');
+    triggerToast('تم حفظ وتحديث بيانات الاتصال والشركة! 💾');
     addActivity(`تعديل وحفظ بيانات الشركة والاتصال: ${details.nameEn}`);
+  };
+
+  const fetchVersionHistory = async () => {
+    if (!isFirebaseConfigured || !db) return;
+    setIsLoadingVersions(true);
+    try {
+      const historyCollectionRef = collection(db, 'settingsVersions');
+      const q = query(historyCollectionRef, orderBy('timestamp', 'desc'), limit(15));
+      const querySnapshot = await getDocs(q);
+      const versionsList: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        versionsList.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setVersionHistory(versionsList);
+    } catch (e) {
+      console.warn('Error retrieving settings versions:', e);
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  };
+
+  const handleRollbackToVersion = async (version: any) => {
+    if (!version || !version.config) return;
+    if (!confirm(isAr ? 'هل أنت متأكد من رغبتك في استعادة هذا الإصدار بالكامل وإلغاء التغييرات اللاحقة؟' : 'Are you sure you want to restore this version completely?')) return;
+    
+    setIsSyncing(true);
+    try {
+      const data = version.config;
+      isIncomingFirestoreUpdate.current = true;
+      
+      // Update local states
+      if (data.companyDetails) setCompanyDetails(data.companyDetails);
+      if (data.projectsList) setProjectsList(data.projectsList);
+      if (data.servicesList) setServicesList(data.servicesList);
+      if (data.statisticsCounters) setStatisticsCounters(data.statisticsCounters);
+      if (data.beforeAfterItems) setBeforeAfterItems(data.beforeAfterItems);
+      if (data.customContent) setCustomContent(data.customContent);
+      if (data.testimonialsList) setTestimonialsList(data.testimonialsList);
+      if (data.submittedInquiries) setSubmittedInquiries(data.submittedInquiries);
+      if (data.mediaFiles) setMediaFiles(data.mediaFiles);
+      if (data.teamMembers) setTeamMembers(data.teamMembers);
+      if (data.selectedGoldTheme) setSelectedGoldTheme(data.selectedGoldTheme);
+      if (data.experienceConfig) setExperienceConfig(data.experienceConfig);
+      if (data.seoMeta) setSeoMeta(data.seoMeta);
+      if (data.blogArticles) setBlogArticles(data.blogArticles);
+      if (data.adminUsers) setAdminUsers(data.adminUsers);
+      if (data.logoConfig) setLogoConfig(data.logoConfig);
+      if (data.activityLogs) setActivityLogs(data.activityLogs);
+
+      // Write directly to siteSettings/global
+      const docRef = doc(db, 'siteSettings', 'global');
+      await setDoc(docRef, data);
+
+      lastKnownServerState.current = data;
+
+      // Add activity entry
+      addActivity(isAr ? `تم التراجع واستعادة الإصدار المؤرشف بتاريخ ${new Date(version.timestamp).toLocaleString()}` : `Rolled back to version from ${new Date(version.timestamp).toLocaleString()}`);
+      triggerToast(isAr ? 'تم بنجاح التراجع واستعادة النسخة النسخة المؤرشفة! 🔄' : 'Successfully rolled back to the selected version! 🔄');
+      
+      // Refresh version list
+      await fetchVersionHistory();
+    } catch (error) {
+      console.error('Error during rollback:', error);
+      triggerToast(isAr ? '❌ فشل عملية استعادة النسخة المؤرشفة.' : '❌ Failed to restore archived version.');
+    } finally {
+      isIncomingFirestoreUpdate.current = false;
+      setIsSyncing(false);
+    }
   };
 
   const handleAddInquiry = (inquiry: any) => {
@@ -459,7 +960,6 @@ export default function App() {
     };
     const updated = [newInq, ...submittedInquiries];
     setSubmittedInquiries(updated);
-    localStorage.setItem('yafta_submitted_inquiries', JSON.stringify(updated));
     triggerToast(isAr ? 'تم تسجيل اهتمامك بنظام الحوسبة الفورية بنجاح! 💰' : 'Calculator estimate logged in CRM!');
     addActivity(`طلب حوسبة مبيعات من: ${inquiry.name} • تقدير: ${inquiry.estimate?.toLocaleString() || 'اتصال مباشر'} ج.م`);
   };
@@ -510,15 +1010,12 @@ export default function App() {
 
   const saveCustomContent = (newContent: any) => {
     setCustomContent(newContent);
-    localStorage.setItem('yafta_custom_content', JSON.stringify(newContent));
     triggerToast('تم فورا تطبيق وحفظ النصوص والمنشتات الإعلانية بنجاح! 🗣️');
     addActivity('تعديل وحفظ خطاطب ونصوص الصفحة الرئيسية والمنشتات');
   };
 
   // Apply visual theme presets dynamically via custom experience studio variables
   useEffect(() => {
-    localStorage.setItem('yafta_gold_theme', selectedGoldTheme);
-    localStorage.setItem('yafta_experience_config', JSON.stringify(experienceConfig));
     const styleId = 'yafta-custom-theme-style';
     let styleTag = document.getElementById(styleId);
     if (!styleTag) {
@@ -674,6 +1171,7 @@ export default function App() {
             customContent={customContent}
             blogArticles={blogArticles}
             testimonialsList={testimonialsList}
+            logoConfig={logoConfig}
           />
         );
       case 'services':
@@ -749,6 +1247,21 @@ export default function App() {
             companyInfo={companyDetails} 
             setActivePage={setActivePage} 
             onAddInquiry={handleAddInquiry}
+            currentUser={currentUser}
+          />
+        );
+      case 'track-repair':
+        return (
+          <TrackRepair 
+            setActivePage={setActivePage} 
+            isAr={isAr} 
+          />
+        );
+      case 'offers':
+        return (
+          <Offers 
+            setActivePage={setActivePage} 
+            isAr={isAr} 
           />
         );
       default:
@@ -835,6 +1348,7 @@ export default function App() {
         {showIntro && (
           <IntroAnimation
             isAr={isAr}
+            logoConfig={logoConfig}
             onComplete={() => {
               setShowIntro(false);
               localStorage.setItem('yafta_intro_viewed', 'true');
@@ -884,6 +1398,8 @@ export default function App() {
         logoConfig={logoConfig}
       />
 
+      <WhatsAppButton config={whatsAppConfig} isAr={isAr} />
+
       {/* 📱 MODERN ANDROID-FIRST MOBILE STICKY BOTTOM NAVIGATION BAR */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-neutral-950/80 backdrop-blur-xl border-t border-gold-505/20 md:hidden flex justify-around items-center px-2 py-2.5 pb-safe shadow-[0_-10px_35px_rgb(0,0,0,0.9)] animate-fade-in">
         {[
@@ -923,8 +1439,8 @@ export default function App() {
         })}
       </div>
 
-      {/* ⚙️ CONSTANT FLOATING ADMIN PORTAL TOGGLE - Restricted to Admin Role */}
-      {currentUser?.role === 'Admin' && (
+      {/* ⚙️ CONSTANT FLOATING ADMIN PORTAL TOGGLE - Restricted to Admin/Super Admin Roles */}
+      {(currentUser?.role === 'Admin' || currentUser?.role === 'Super Admin') && (
         <button 
           onClick={() => {
             setIsAdminOpen(!isAdminOpen);
@@ -948,7 +1464,7 @@ export default function App() {
       {/* ════════════════════════════════════════════════════
           COLLAPSIBLE MASTER ADMIN SIDEBAR PANEL (BLACK & GOLD)
           ═════════════════════════════════ </App.tsx> ═════════ */}
-      {currentUser?.role === 'Admin' && isAdminOpen && (
+      {(currentUser?.role === 'Admin' || currentUser?.role === 'Super Admin') && isAdminOpen && (
         <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[500px] md:w-[600px] lg:w-[680px] xl:w-[740px] bg-neutral-950 border-l-2 border-gold-505/40 flex flex-col justify-between shadow-2xl shadow-gold-505/10 animate-slide-in text-right font-sans">
           
           {/* Header Panel */}
@@ -1116,6 +1632,119 @@ export default function App() {
                         )}
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                {/* Firebase Cloud Sync Control Panel & Version History */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  {/* Cloud Sync Status and Options */}
+                  <div className="bg-neutral-900 border border-gold-500/10 p-4 rounded-xl space-y-4 text-right">
+                    <h3 className="text-sm font-black text-white flex items-center gap-1.5 justify-end">
+                      <span>{isAr ? 'إدارة التزامن السحابي الفوري' : 'Real-time Cloud Sync Control'}</span>
+                      <Globe className="w-4.5 h-4.5 text-gold-505" />
+                    </h3>
+                    
+                    <div className="space-y-3 text-xs">
+                      <div className="flex items-center justify-between p-2.5 bg-neutral-950/40 rounded-lg border border-neutral-800">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2.5 h-2.5 rounded-full ${isSynced ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-bounce'}`} />
+                          <span className="text-[11px] font-mono font-bold text-neutral-300">
+                            {isSynced 
+                              ? (isAr ? 'متصل ومزامن بالكامل' : 'Synced & Live') 
+                              : (isAr ? 'تغييرات غير محفوظة سحابياً' : 'Unsaved Local Changes')}
+                          </span>
+                        </div>
+                        <span className="text-neutral-400 font-bold">{isAr ? 'حالة المزامنة:' : 'Sync Status:'}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-2">
+                        <div className="flex items-center gap-2">
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              checked={autoSave} 
+                              onChange={(e) => setAutoSave(e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-neutral-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-neutral-300 after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-gold-505"></div>
+                          </label>
+                        </div>
+                        <span className="text-neutral-300 font-semibold">{isAr ? 'تمكين الحفظ التلقائي الفوري (Auto-Save):' : 'Enable Real-time Auto-Save:'}</span>
+                      </div>
+
+                      <div className="pt-2 flex gap-2">
+                        <button
+                          onClick={handleManualSave}
+                          disabled={isSyncing || (!hasUnsavedChanges && isSynced)}
+                          className={`w-full py-2 px-4 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            isSyncing 
+                              ? 'bg-neutral-850 text-neutral-500 cursor-not-allowed'
+                              : (!hasUnsavedChanges && isSynced)
+                                ? 'bg-neutral-850 text-neutral-500 cursor-not-allowed border border-neutral-800'
+                                : 'bg-gold-950 text-gold-300 hover:bg-gold-900 border border-gold-505/30'
+                          }`}
+                        >
+                          {isSyncing ? (
+                            <RefreshCw className="w-4 h-4 animate-spin text-gold-505" />
+                          ) : (
+                            <Save className="w-4 h-4 text-gold-505" />
+                          )}
+                          <span>{isAr ? 'حفظ التعديلات يدوياً الآن' : 'Save Modifications Manually'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Version History & Rollback Panel */}
+                  <div className="bg-neutral-900 border border-gold-500/10 p-4 rounded-xl space-y-3 text-right">
+                    <div className="flex items-center justify-between">
+                      <button 
+                        onClick={fetchVersionHistory}
+                        className="text-[10px] text-gold-505 hover:underline font-bold"
+                      >
+                        {isAr ? 'تحديث السجل 🔄' : 'Refresh 🔄'}
+                      </button>
+                      <h3 className="text-sm font-black text-white flex items-center gap-1.5 justify-end">
+                        <span>{isAr ? 'سجل إصدارات وتراجع الإعدادات' : 'Configuration Backups & Rollback'}</span>
+                        <History className="w-4.5 h-4.5 text-gold-505" />
+                      </h3>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-[160px] overflow-y-auto scrollbar-thin text-xs">
+                      {isLoadingVersions ? (
+                        <div className="text-center py-6 text-neutral-500">
+                          <RefreshCw className="w-5 h-5 animate-spin mx-auto text-gold-505 mb-1" />
+                          <span>{isAr ? 'جاري تحميل الأرشيف السحابي...' : 'Retrieving cloud archives...'}</span>
+                        </div>
+                      ) : versionHistory.length === 0 ? (
+                        <div className="text-center py-8 text-neutral-500 italic">
+                          {isAr ? 'لا يوجد إصدارات مؤرشفة حالياً' : 'No saved versions found yet'}
+                        </div>
+                      ) : (
+                        versionHistory.map((ver: any) => (
+                          <div 
+                            key={ver.id} 
+                            className="bg-neutral-950/40 border border-neutral-850 hover:border-gold-505/20 p-2 rounded-lg flex items-center justify-between gap-4 text-right transition-all"
+                          >
+                            <button
+                              onClick={() => handleRollbackToVersion(ver)}
+                              disabled={isSyncing}
+                              className="px-2.5 py-1 rounded bg-gold-950/50 hover:bg-gold-900 border border-gold-505/20 text-gold-300 text-[10px] font-bold cursor-pointer transition-all disabled:opacity-50"
+                            >
+                              {isAr ? 'استعادة ↩️' : 'Restore ↩️'}
+                            </button>
+                            <div className="min-w-0 flex-1">
+                              <span className="text-[9px] text-neutral-500 block font-mono">
+                                {new Date(ver.timestamp).toLocaleString(isAr ? 'ar-EG' : 'en-US')}
+                              </span>
+                              <p className="text-[10.5px] text-neutral-300 font-medium truncate">
+                                {isAr ? ver.descriptionAr : ver.descriptionEn}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1323,13 +1952,7 @@ export default function App() {
                                     onChange={(e) => {
                                       const file = e.target.files?.[0];
                                       if (file) {
-                                        const r = new FileReader();
-                                        r.onload = () => {
-                                          updateLogoConfig({ ...logoConfig, imageSrcDark: r.result as string });
-                                          addActivity(`تحميل ملف شعار داكن: ${file.name}`);
-                                          triggerToast(isAr ? 'تم تحميل وقراءة ملف الشعار الداكن 📂' : 'Dark asset read successfully 📂');
-                                        };
-                                        r.readAsDataURL(file);
+                                        uploadLogoFile(file, 'dark');
                                       }
                                     }}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -1362,13 +1985,7 @@ export default function App() {
                                     onChange={(e) => {
                                       const file = e.target.files?.[0];
                                       if (file) {
-                                        const r = new FileReader();
-                                        r.onload = () => {
-                                          updateLogoConfig({ ...logoConfig, imageSrcLight: r.result as string });
-                                          addActivity(`تحميل ملف شعار مضيء: ${file.name}`);
-                                          triggerToast(isAr ? 'تم تحميل وقراءة ملف الشعار المضيء 📂' : 'Light asset read successfully 📂');
-                                        };
-                                        r.readAsDataURL(file);
+                                        uploadLogoFile(file, 'light');
                                       }
                                     }}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -1828,7 +2445,7 @@ export default function App() {
                         {isAr ? '٧. قواعد ظهور الشعار بأقسام الموقع:' : '7. Output Target Visibility:'}
                       </h4>
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                         {/* Header target */}
                         <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-850 flex items-center justify-between">
                           <span className="text-xs text-neutral-300 font-bold">{isAr ? 'الهيدر الرأسي (Header)' : 'Main Header'}</span>
@@ -1869,6 +2486,28 @@ export default function App() {
                             type="checkbox"
                             checked={logoConfig.visibleInHero}
                             onChange={(e) => updateLogoConfig({ ...logoConfig, visibleInHero: e.target.checked })}
+                            className="w-4 h-4 rounded text-gold-505 bg-neutral-900 border-neutral-850 accent-gold-505 cursor-pointer"
+                          />
+                        </div>
+
+                        {/* Main Page / Hero Start target */}
+                        <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-850 flex items-center justify-between">
+                          <span className="text-xs text-neutral-300 font-bold">{isAr ? 'بداية الواجهة الرئيسية' : 'Hero Start'}</span>
+                          <input
+                            type="checkbox"
+                            checked={logoConfig.visibleInHeroStart !== false}
+                            onChange={(e) => updateLogoConfig({ ...logoConfig, visibleInHeroStart: e.target.checked })}
+                            className="w-4 h-4 rounded text-gold-505 bg-neutral-900 border-neutral-850 accent-gold-505 cursor-pointer"
+                          />
+                        </div>
+
+                        {/* Intro Splash target */}
+                        <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-850 flex items-center justify-between">
+                          <span className="text-xs text-neutral-300 font-bold">{isAr ? 'الواجهة الافتتاحية' : 'Intro Splash'}</span>
+                          <input
+                            type="checkbox"
+                            checked={logoConfig.visibleInIntro !== false}
+                            onChange={(e) => updateLogoConfig({ ...logoConfig, visibleInIntro: e.target.checked })}
                             className="w-4 h-4 rounded text-gold-505 bg-neutral-900 border-neutral-850 accent-gold-505 cursor-pointer"
                           />
                         </div>
@@ -2107,6 +2746,332 @@ export default function App() {
                       value={companyDetails.addressEn}
                       onChange={(e) => saveCompanyDetails({ ...companyDetails, addressEn: e.target.value })}
                     />
+                  </div>
+                </div>
+
+                <span className="text-[11px] bg-gold-950 text-gold-300 px-2 py-0.5 rounded tracking-wider uppercase font-mono block w-fit mt-6">
+                  {isAr ? 'تخصيص زر الواتساب العائم' : 'WHATSAPP FLOATING BUTTON CUSTOMIZATION'}
+                </span>
+
+                <div className="bg-neutral-900 border border-gold-500/10 p-5 rounded-2xl space-y-4 text-right">
+                  <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+                    <div className="space-y-0.5">
+                      <label className="text-xs font-bold text-white block">{isAr ? 'تفعيل الزر العائم:' : 'Enable Floating Button:'}</label>
+                      <span className="text-[10px] text-zinc-400 block">
+                        {isAr ? 'عرض أو إخفاء زر الواتساب العائم في أسفل صفحات الموقع' : 'Show or hide the floating WhatsApp icon on all pages'}
+                      </span>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      className="w-5 h-5 rounded accent-gold-505 cursor-pointer"
+                      checked={whatsAppConfig.enabled}
+                      onChange={(e) => setWhatsAppConfig({ ...whatsAppConfig, enabled: e.target.checked })}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-white block">{isAr ? 'رقم الهاتف (مع رمز الدولة بدون +):' : 'Phone Number (with Country Code):'}</label>
+                      <input 
+                        type="text"
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2.5 text-xs text-white text-right font-mono"
+                        value={whatsAppConfig.number}
+                        onChange={(e) => setWhatsAppConfig({ ...whatsAppConfig, number: e.target.value })}
+                        placeholder="201116210464"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-white block">{isAr ? 'نص الزر (يظهر بجانب الأيقونة):' : 'Button Label Text:'}</label>
+                      <input 
+                        type="text"
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2.5 text-xs text-white text-right font-sans"
+                        value={whatsAppConfig.text}
+                        onChange={(e) => setWhatsAppConfig({ ...whatsAppConfig, text: e.target.value })}
+                        placeholder="تواصل معنا"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-white block">{isAr ? 'موضع الزر بالصفحة:' : 'Widget Position:'}</label>
+                      <select 
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2.5 text-xs text-white text-right font-sans"
+                        value={whatsAppConfig.position}
+                        onChange={(e) => setWhatsAppConfig({ ...whatsAppConfig, position: e.target.value as any })}
+                      >
+                        <option value="bottom-right">{isAr ? 'الزاوية اليمنى السفلية' : 'Bottom Right'}</option>
+                        <option value="bottom-left">{isAr ? 'الزاوية اليسرى السفلية' : 'Bottom Left'}</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-white block">{isAr ? 'لون الزر (كود هيكس):' : 'Widget Hex Color:'}</label>
+                      <div className="flex gap-2">
+                        <input 
+                          type="color"
+                          className="w-10 h-9 bg-neutral-950 border border-neutral-800 rounded cursor-pointer"
+                          value={whatsAppConfig.color}
+                          onChange={(e) => setWhatsAppConfig({ ...whatsAppConfig, color: e.target.value })}
+                        />
+                        <input 
+                          type="text"
+                          className="flex-grow bg-neutral-950 border border-neutral-800 rounded-lg p-2.5 text-xs text-white font-mono text-center"
+                          value={whatsAppConfig.color}
+                          onChange={(e) => setWhatsAppConfig({ ...whatsAppConfig, color: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-white block">{isAr ? 'رسالة الترحيب التلقائية المتلقاة:' : 'Pre-filled Custom Message:'}</label>
+                    <textarea 
+                      className="w-full h-16 bg-neutral-950 border border-neutral-800 rounded-lg p-2.5 text-xs text-white text-right font-sans"
+                      value={whatsAppConfig.greetingMessage}
+                      onChange={(e) => setWhatsAppConfig({ ...whatsAppConfig, greetingMessage: e.target.value })}
+                    />
+                  </div>
+
+                  {/* ───────────────────────────────────────────────────
+                      Welcome Message Trigger Notification Settings
+                      ─────────────────────────────────────────────────── */}
+                  <div className="border-t border-neutral-800 pt-4 mt-2">
+                    <h4 className="text-xs font-black text-gold-300 tracking-wider mb-3">
+                      {isAr ? '💬 إعدادات فقاعة الترحيب التلقائية' : '💬 AUTOMATED WELCOME TRIGGER SETTINGS'}
+                    </h4>
+
+                    <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <label className="text-xs font-bold text-white block">{isAr ? 'تفعيل فقاعة الترحيب التلقائية:' : 'Enable Welcome Trigger Bubble:'}</label>
+                          <span className="text-[10px] text-zinc-400 block">
+                            {isAr ? 'تظهر فقاعة ترحيب متحركة تلقائياً بعد فترة زمنية محددة لجذب العميل.' : 'Shows an animated floating chat bubble notification after a short delay.'}
+                          </span>
+                        </div>
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded accent-gold-505 cursor-pointer"
+                          checked={whatsAppConfig.showWelcomeTrigger !== false}
+                          onChange={(e) => setWhatsAppConfig({ ...whatsAppConfig, showWelcomeTrigger: e.target.checked })}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <div className="space-y-1 md:col-span-1">
+                          <label className="text-xs font-bold text-white block">{isAr ? 'زمن الظهور التلقائي (ثواني):' : 'Trigger Delay (Seconds):'}</label>
+                          <input 
+                            type="number"
+                            min="1"
+                            max="30"
+                            className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs text-white text-center font-mono"
+                            value={whatsAppConfig.welcomeTriggerDelay || 4}
+                            onChange={(e) => setWhatsAppConfig({ ...whatsAppConfig, welcomeTriggerDelay: parseInt(e.target.value) || 4 })}
+                          />
+                        </div>
+
+                        <div className="space-y-1 md:col-span-2">
+                          <label className="text-xs font-bold text-white block">{isAr ? 'نص ترحيب الفقاعة (عربي):' : 'Trigger Text (Arabic):'}</label>
+                          <input 
+                            type="text"
+                            className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs text-white text-right font-sans"
+                            value={whatsAppConfig.welcomeTriggerTextAr || ''}
+                            onChange={(e) => setWhatsAppConfig({ ...whatsAppConfig, welcomeTriggerTextAr: e.target.value })}
+                            placeholder="مرحباً بك! لدينا فريق متخصص لمساعدتك..."
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-white block">{isAr ? 'نص ترحيب الفقاعة (إنجليزي):' : 'Trigger Text (English):'}</label>
+                        <input 
+                          type="text"
+                          className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs text-white text-left font-sans"
+                          value={whatsAppConfig.welcomeTriggerTextEn || ''}
+                          onChange={(e) => setWhatsAppConfig({ ...whatsAppConfig, welcomeTriggerTextEn: e.target.value })}
+                          placeholder="Welcome! We have a specialized team ready..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ───────────────────────────────────────────────────
+                      Multi-Department Routing Settings
+                      ─────────────────────────────────────────────────── */}
+                  <div className="border-t border-neutral-800 pt-4 mt-2">
+                    <div className="flex items-center justify-between mb-3">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const list = [...(whatsAppConfig.departments || [])];
+                          list.push({
+                            id: `dept-${Date.now()}`,
+                            nameAr: 'قسم الاستفسارات الجديد',
+                            nameEn: 'New Support Line',
+                            descriptionAr: 'مستشار المبيعات أو الدعم الفني والمتابعة',
+                            descriptionEn: 'Technical signage consultation desk',
+                            number: whatsAppConfig.number || '201116210464',
+                            greetingMessage: 'مرحباً، أود الاستفسار عن لافتات يافطة...',
+                            isOnline: true
+                          });
+                          setWhatsAppConfig({ ...whatsAppConfig, departments: list });
+                        }}
+                        className="px-3 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5" />
+                        <span>{isAr ? 'إضافة قسم جديد +' : 'Add Department +'}</span>
+                      </button>
+
+                      <h4 className="text-xs font-black text-gold-300 tracking-wider">
+                        {isAr ? '💼 إعدادات الأقسام المتعددة لتوجيه العملاء' : '💼 MULTI-DEPARTMENT SUPPORT PORTS'}
+                      </h4>
+                    </div>
+
+                    <p className="text-[10px] text-zinc-400 leading-relaxed text-right mb-4 bg-neutral-950/40 p-2.5 rounded-lg border border-neutral-900">
+                      {isAr 
+                        ? '💡 عند إضافة أكثر من قسم هنا، سيتحول زر الواتساب العائم تلقائياً إلى بوابة دردشة فاخرة تسمح للعميل باختيار القسم الهندسي أو التجاري المناسب وتوجيه رسالته إليه مباشرة.' 
+                        : '💡 Adding multiple departments automatically upgrades the floating WhatsApp button to an elite multi-channel chat gateway where clients can reach specific team units.'}
+                    </p>
+
+                    <div className="space-y-4">
+                      {((whatsAppConfig.departments || [])).map((dept, index) => (
+                        <div key={dept.id || index} className="bg-neutral-950 border border-neutral-800 rounded-xl p-4 relative space-y-3">
+                          
+                          {/* Header / Delete button */}
+                          <div className="flex items-center justify-between border-b border-neutral-900 pb-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const list = [...(whatsAppConfig.departments || [])].filter((_, i) => i !== index);
+                                setWhatsAppConfig({ ...whatsAppConfig, departments: list });
+                              }}
+                              className="w-6 h-6 rounded-lg bg-red-950/30 hover:bg-red-950 border border-red-900/30 text-red-400 flex items-center justify-center transition-colors cursor-pointer"
+                              title={isAr ? 'حذف القسم' : 'Delete Department'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+
+                            <span className="text-[10px] bg-gold-950/60 border border-gold-505/20 text-gold-300 px-2 py-0.5 rounded font-mono font-bold">
+                              #{index + 1} {isAr ? 'قسم الدعم' : 'Support Unit'}
+                            </span>
+                          </div>
+
+                          {/* Grid Inputs */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-zinc-400 block">{isAr ? 'اسم القسم (عربي):' : 'Dept Name (Arabic):'}</label>
+                              <input 
+                                type="text"
+                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs text-white text-right"
+                                value={dept.nameAr}
+                                onChange={(e) => {
+                                  const list = [...(whatsAppConfig.departments || [])];
+                                  list[index] = { ...list[index], nameAr: e.target.value };
+                                  setWhatsAppConfig({ ...whatsAppConfig, departments: list });
+                                }}
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-zinc-400 block">{isAr ? 'اسم القسم (إنجليزي):' : 'Dept Name (English):'}</label>
+                              <input 
+                                type="text"
+                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs text-white text-left font-mono"
+                                value={dept.nameEn}
+                                onChange={(e) => {
+                                  const list = [...(whatsAppConfig.departments || [])];
+                                  list[index] = { ...list[index], nameEn: e.target.value };
+                                  setWhatsAppConfig({ ...whatsAppConfig, departments: list });
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-zinc-400 block">{isAr ? 'الوصف الفرعي (عربي):' : 'Sub-description (Arabic):'}</label>
+                              <input 
+                                type="text"
+                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs text-white text-right"
+                                value={dept.descriptionAr}
+                                onChange={(e) => {
+                                  const list = [...(whatsAppConfig.departments || [])];
+                                  list[index] = { ...list[index], descriptionAr: e.target.value };
+                                  setWhatsAppConfig({ ...whatsAppConfig, departments: list });
+                                }}
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-zinc-400 block">{isAr ? 'الوصف الفرعي (إنجليزي):' : 'Sub-description (English):'}</label>
+                              <input 
+                                type="text"
+                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs text-white text-left font-sans"
+                                value={dept.descriptionEn}
+                                onChange={(e) => {
+                                  const list = [...(whatsAppConfig.departments || [])];
+                                  list[index] = { ...list[index], descriptionEn: e.target.value };
+                                  setWhatsAppConfig({ ...whatsAppConfig, departments: list });
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="space-y-1 md:col-span-1">
+                              <label className="text-[10px] font-bold text-zinc-400 block">{isAr ? 'حالة العمل:' : 'Work Status:'}</label>
+                              <select 
+                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs text-white text-right"
+                                value={dept.isOnline ? 'online' : 'offline'}
+                                onChange={(e) => {
+                                  const list = [...(whatsAppConfig.departments || [])];
+                                  list[index] = { ...list[index], isOnline: e.target.value === 'online' };
+                                  setWhatsAppConfig({ ...whatsAppConfig, departments: list });
+                                }}
+                              >
+                                <option value="online">{isAr ? '● متصل ونشط' : '● Online & Active'}</option>
+                                <option value="offline">{isAr ? '○ غير متصل حالياً' : '○ Offline'}</option>
+                              </select>
+                            </div>
+
+                            <div className="space-y-1 md:col-span-2">
+                              <label className="text-[10px] font-bold text-zinc-400 block">{isAr ? 'رقم الهاتف (مع كود الدولة):' : 'Hotline Number (with Code):'}</label>
+                              <input 
+                                type="text"
+                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs text-white text-center font-mono"
+                                value={dept.number}
+                                onChange={(e) => {
+                                  const list = [...(whatsAppConfig.departments || [])];
+                                  list[index] = { ...list[index], number: e.target.value };
+                                  setWhatsAppConfig({ ...whatsAppConfig, departments: list });
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-zinc-400 block">{isAr ? 'الرسالة التلقائية الخاصة بهذا القسم:' : 'Dept Custom Message:'}</label>
+                            <textarea 
+                              className="w-full h-12 bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs text-white text-right font-sans"
+                              value={dept.greetingMessage}
+                              onChange={(e) => {
+                                const list = [...(whatsAppConfig.departments || [])];
+                                list[index] = { ...list[index], greetingMessage: e.target.value };
+                                setWhatsAppConfig({ ...whatsAppConfig, departments: list });
+                              }}
+                            />
+                          </div>
+
+                        </div>
+                      ))}
+
+                      {(!whatsAppConfig.departments || whatsAppConfig.departments.length === 0) && (
+                        <div className="p-6 text-center text-zinc-500 border-2 border-dashed border-neutral-800 rounded-xl text-xs">
+                          {isAr ? '⚠️ لم يتم إضافة أي قسم فرعي بعد. سيعمل الزر بنمطه البسيط.' : '⚠️ No departments configured. Simple fallback mode active.'}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

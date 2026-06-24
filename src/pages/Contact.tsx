@@ -6,12 +6,14 @@
 import { useState, FormEvent } from 'react';
 import { CompanyInfo, PageId } from '../types';
 import { Mail, Phone, MapPin, Send, MessageSquare, Calculator, Check, Sparkles, Trash2, Printer, Download, Plus, Landmark, ExternalLink } from 'lucide-react';
+import { VisualConfigurator } from '../components/VisualConfigurator';
 
 interface Props {
   isAr: boolean;
   companyInfo: CompanyInfo;
   setActivePage: (page: PageId) => void;
   onAddInquiry?: (inquiry: any) => void;
+  currentUser?: any;
 }
 
 interface SavedEstimate {
@@ -27,7 +29,7 @@ interface SavedEstimate {
   date: string;
 }
 
-export default function Contact({ isAr, companyInfo, setActivePage, onAddInquiry }: Props) {
+export default function Contact({ isAr, companyInfo, setActivePage, onAddInquiry, currentUser }: Props) {
   // Quote calculator categories
   const [calcCategory, setCalcCategory] = useState<'signage' | 'printing' | 'digital'>('signage');
 
@@ -414,7 +416,8 @@ _✓ ${isAr ? 'مشمول تركيب ومعاينة هندسية ميدانية 
       </section>
 
       {/* 2. DYNAMIC INTERACTIVE PRICING CALCULATOR */}
-      <section className="bg-neutral-950/70 rounded-3xl border border-[#e5c060]/20 overflow-hidden shadow-2xl relative">
+      <div className="hidden">
+        <section className="bg-neutral-950/70 rounded-3xl border border-[#e5c060]/20 overflow-hidden shadow-2xl relative">
         <div className="absolute right-0 top-0 w-64 h-64 bg-gold-950/10 rounded-full blur-3xl pointer-events-none"></div>
         
         {/* Switch Header bars */}
@@ -737,6 +740,9 @@ _✓ ${isAr ? 'مشمول تركيب ومعاينة هندسية ميدانية 
 
         </div>
       </section>
+      </div>
+
+      <VisualConfigurator isAr={isAr} isAdmin={currentUser?.role === 'Admin' || currentUser?.role === 'Super Admin'} />
 
       {/* 2.5 LOCAL SAVED ESTIMATES DRAWER (If any saved) */}
       {savedQuotes.length > 0 && (

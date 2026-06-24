@@ -4,13 +4,15 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { PageId, Project, Testimonial } from '../types';
+import { PageId, Project, Testimonial, LogoConfig } from '../types';
+import LogoRenderer from '../components/LogoRenderer';
 import { STATISTICS_COUNTERS, PROJECTS_DATA, TRUST_VALUES, TESTIMONIALS_DATA } from '../data';
 import { 
   Sparkles, ArrowRight, ArrowLeft, Star, Phone, MessageSquare, ShieldCheck, 
   Play, Award, Layers, ChevronRight, ChevronLeft, Calendar, User, ArrowUpRight, 
   Check, Zap, Cpu, RefreshCw, BarChart3, HelpCircle, Eye, EyeOff, Info, 
-  BookOpen, Heart, Laptop, Smartphone, HelpCircle as HelpIcon, Calculator
+  BookOpen, Heart, Laptop, Smartphone, HelpCircle as HelpIcon, Calculator,
+  Wrench, Tag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AISpecGenerator from '../components/AISpecGenerator';
@@ -32,6 +34,7 @@ interface Props {
   };
   blogArticles?: any[];
   testimonialsList?: Testimonial[];
+  logoConfig?: LogoConfig;
 }
 
 export const SECTORS_LIST = [
@@ -85,7 +88,8 @@ export default function Home({
     { id: '2', titleAr: 'مقارنة الاستانلس ستيل عيار 304 والعيارات المقلدة في لافتات الشوارع', titleEn: 'Stainless Steel 304 vs Fake Alloys in Signboards', category: 'خامات ومواد', categoryEn: 'Materials', date: '15/06/2026', tagsAr: ['ستانلس', 'جودة'], tagsEn: ['Stainless', 'Quality'] },
     { id: '3', titleAr: 'تأثير الإضاءة الخلفية الهالة (Halo Backlit) على جذب المارة للمتاجر الفاخرة', titleEn: 'Psychology of Halo Lighting in Premium Reseller Stores', category: 'تصاميم إبداعية', categoryEn: 'Creative Design', date: '10/06/2026', tagsAr: ['إضاءة', 'دعاية'], tagsEn: ['Lighting', 'Marketing'] }
   ],
-  testimonialsList = TESTIMONIALS_DATA
+  testimonialsList = TESTIMONIALS_DATA,
+  logoConfig
 }: Props) {
   
   // Navigation triggering
@@ -380,19 +384,27 @@ export default function Home({
       </div>
 
       {/* YAFTA SIGNATURE HEADER LOGO */}
-      <div className="max-w-7xl mx-auto px-4 pt-8 pb-2 flex flex-col items-center justify-center text-center relative z-20 animate-fade-in select-none">
-        <div className="p-2.5 bg-neutral-950/50 border border-gold-550/20 rounded-full flex items-center justify-center gap-3 shadow-xl">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-neutral-900 to-gold-950 border border-gold-505 flex items-center justify-center shadow-inner">
-            <span className="text-sm font-black font-sans text-gold-505">Y</span>
-          </div>
-          <div className="flex flex-col text-right pr-1">
-            <span className="text-lg font-black tracking-widest font-sans uppercase text-gold-505 leading-none">YAFTA</span>
-            <span className="text-[7.5px] font-bold uppercase tracking-[0.2em] text-neutral-400 mt-1">
-              {isAr ? 'وكالة يافطة للدعاية والإعلان' : 'ADVERTISING AGENCY'}
-            </span>
-          </div>
+      {(!logoConfig || logoConfig.visibleInHeroStart !== false) && (
+        <div className="max-w-7xl mx-auto px-4 pt-8 pb-2 flex flex-col items-center justify-center text-center relative z-20 animate-fade-in select-none">
+          {logoConfig ? (
+            <div className="p-3 bg-neutral-950/50 border border-neutral-850 rounded-2xl flex items-center justify-center shadow-xl">
+              <LogoRenderer config={logoConfig} isAr={isAr} mode="dark" />
+            </div>
+          ) : (
+            <div className="p-2.5 bg-neutral-950/50 border border-gold-550/20 rounded-full flex items-center justify-center gap-3 shadow-xl">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-neutral-900 to-gold-950 border border-gold-505 flex items-center justify-center shadow-inner">
+                <span className="text-sm font-black font-sans text-gold-505">Y</span>
+              </div>
+              <div className="flex flex-col text-right pr-1">
+                <span className="text-lg font-black tracking-widest font-sans uppercase text-gold-505 leading-none">YAFTA</span>
+                <span className="text-[7.5px] font-bold uppercase tracking-[0.2em] text-neutral-400 mt-1">
+                  {isAr ? 'وكالة يافطة للدعاية والإعلان' : 'ADVERTISING AGENCY'}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* 1. CINEMATIC LUXURY HERO BANNER - Split Grid Layout */}
       <section className="relative min-h-[70vh] flex items-center justify-center overflow-hidden bg-black text-white px-4 py-8 border-b border-gold-500/20 z-10">
@@ -686,6 +698,88 @@ export default function Home({
               className="mt-4 w-full py-2.5 bg-gold-950/40 hover:bg-gold-505 hover:text-black border border-gold-505/30 text-gold-300 text-xs font-bold rounded-xl transition-all duration-300 text-center flex items-center justify-center gap-1"
             >
               <span>{isAr ? 'طلب معاينة معمارية ثلاثية الأبعاد' : 'Request 3D Rendering mockup'}</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* App Card 4: Repair Ticket Tracker */}
+          <div className="snap-center shrink-0 w-[84vw] sm:w-[350px] relative rounded-2xl glass-premium p-5 border border-gold-505/20 flex flex-col justify-between shadow-xl bg-neutral-950/80 hover:border-gold-400 transition-colors duration-300">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl bg-gold-950/80 border border-gold-505/30 flex items-center justify-center text-gold-300 shadow-md">
+                  <Wrench className="w-5 h-5" />
+                </div>
+                <span className="text-[9px] bg-gold-950/80 text-gold-300 border border-gold-505/20 px-2.5 py-1 rounded-full font-black uppercase">
+                  {isAr ? 'الصيانة والدعم' : 'Service'}
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-white">
+                {isAr ? 'بوابة تتبع صيانة اللافتات 🛠️' : 'Live Signage Repair Tracker 🛠️'}
+              </h3>
+              <p className="text-xs text-neutral-300 leading-relaxed min-h-[50px]">
+                {isAr 
+                  ? 'تابع الفحص الفني، القطع المبدلة، تاريخ الاستلام وفترة الضمان للوحتك الإعلانية بشكل فوري بمجرد إدخال رمز طلب الصيانة.' 
+                  : 'Track hardware diagnostics, parts replaced, estimated return time, and active warranty status instantly with your repair code.'}
+              </p>
+
+              {/* Dynamic Interface Design Wireframe */}
+              <div className="bg-neutral-950/90 border border-neutral-800 rounded-xl p-3 flex justify-between items-center text-[9px] font-mono">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-zinc-500">{isAr ? 'الكود النشط:' : 'Ticket Code:'}</span>
+                  <span className="text-gold-300 font-bold">REP-7402</span>
+                </div>
+                <div className="bg-gold-950/80 text-gold-505 border border-gold-505/30 rounded px-1.5 py-0.5 text-[8px] animate-pulse">
+                  {isAr ? 'جاري الإصلاح واللحام' : 'BENCH REPAIR ACTIVE'}
+                </div>
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => handleNav('track-repair')}
+              className="mt-4 w-full py-2.5 bg-gold-950/40 hover:bg-gold-505 hover:text-black border border-gold-505/30 text-gold-300 text-xs font-bold rounded-xl transition-all duration-300 text-center flex items-center justify-center gap-1"
+            >
+              <span>{isAr ? 'تتبع صيانة لوحتك ⚡' : 'Track Your Repair ⚡'}</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* App Card 5: Exclusive Offers Catalog */}
+          <div className="snap-center shrink-0 w-[84vw] sm:w-[350px] relative rounded-2xl glass-premium p-5 border border-gold-505/20 flex flex-col justify-between shadow-xl bg-neutral-950/80 hover:border-gold-400 transition-colors duration-300">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl bg-gold-950/80 border border-gold-505/30 flex items-center justify-center text-gold-300 shadow-md">
+                  <Tag className="w-5 h-5" />
+                </div>
+                <span className="text-[9px] bg-emerald-950/60 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-black uppercase">
+                  {isAr ? 'خصومات حصرية' : 'Hot Deals'}
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-white">
+                {isAr ? 'باقات وعروض الهويات المتكاملة 🏷️' : 'Branding & Cladding Offers 🏷️'}
+              </h3>
+              <p className="text-xs text-neutral-300 leading-relaxed min-h-[50px]">
+                {isAr 
+                  ? 'خصومات صيفية مميزة تصل إلى ٣٠٪ على لافتات المحلات الفاخرة، والواجهات المتكاملة والكلادينج بضمان حقيقي يدوم طويلاً.' 
+                  : 'Get premium seasonal discounts up to 30% on emerging shop signs, elite cladding facades, and corporate signages.'}
+              </p>
+
+              {/* Dynamic Interface Design Wireframe */}
+              <div className="bg-neutral-950/90 border border-neutral-800 rounded-xl p-3 flex justify-between items-center text-[9px] font-mono">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-zinc-500">{isAr ? 'باقة المحلات الناشئة:' : 'Emerging Retail Starter:'}</span>
+                  <span className="text-emerald-400 font-bold">8,500 EGP <span className="line-through text-zinc-600 text-[8px] ml-1">12,000</span></span>
+                </div>
+                <div className="bg-emerald-950 border border-emerald-500/20 text-emerald-400 rounded px-1.5 py-0.5 text-[8px]">
+                  {isAr ? 'وفر ٣٠٪' : '30% OFF'}
+                </div>
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => handleNav('offers')}
+              className="mt-4 w-full py-2.5 bg-gold-950/40 hover:bg-gold-505 hover:text-black border border-gold-505/30 text-gold-300 text-xs font-bold rounded-xl transition-all duration-300 text-center flex items-center justify-center gap-1"
+            >
+              <span>{isAr ? 'تصفح الباقات والعروض 🏷️' : 'Browse Promo Offers 🏷️'}</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>

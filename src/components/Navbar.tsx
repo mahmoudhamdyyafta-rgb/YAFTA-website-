@@ -220,7 +220,15 @@ export default function Navbar({ activePage, setActivePage, isAr, setIsAr, compa
                   <User className="w-3.5 h-3.5 text-gold-505" />
                   <span className="max-w-[120px] truncate">{currentUser.name}</span>
                   <span className="text-[10px] bg-gold-950 text-gold-350 px-1.5 py-0.5 rounded-md font-black uppercase border border-gold-505/10">
-                    {currentUser.role === 'Admin' ? (isAr ? 'مشرف' : 'Admin') : currentUser.role === 'Employee' ? (isAr ? 'موظف' : 'Employee') : (isAr ? 'عميل' : 'Client')}
+                    {currentUser.role === 'Super Admin' ? (isAr ? 'مالك النظام' : 'Super Admin') :
+                     currentUser.role === 'Admin' ? (isAr ? 'مدير عام' : 'Admin') :
+                     currentUser.role === 'Finance Manager' ? (isAr ? 'المدير المالي' : 'Finance Manager') :
+                     currentUser.role === 'Operations Manager' ? (isAr ? 'مدير التشغيل' : 'Operations Manager') :
+                     currentUser.role === 'Warehouse Manager' ? (isAr ? 'مدير المستودع' : 'Warehouse Manager') :
+                     currentUser.role === 'Customer Service' ? (isAr ? 'خدمة العملاء' : 'Customer Service') :
+                     currentUser.role === 'Technician' ? (isAr ? 'فني تركيبات' : 'Technician') :
+                     currentUser.role === 'Read Only Viewer' ? (isAr ? 'مراقب عام' : 'Viewer') :
+                     (isAr ? 'عميل' : 'Client')}
                   </span>
                 </button>
                 <button
@@ -331,7 +339,15 @@ export default function Navbar({ activePage, setActivePage, isAr, setIsAr, compa
               <div className="p-3 bg-neutral-900 rounded-xl border border-gold-505/20 space-y-2 text-right">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] bg-gold-950 text-gold-350 px-2 py-0.5 rounded font-black uppercase text-[9px]">
-                    {currentUser.role === 'Admin' ? (isAr ? 'مدير عام مشرف' : 'Super Admin') : currentUser.role === 'Employee' ? (isAr ? 'موظف تشغيل فني' : 'Operations Staff') : (isAr ? 'حساب عميل معتمد' : 'Verified Client')}
+                    {currentUser.role === 'Super Admin' ? (isAr ? 'مالك النظام • Super Admin' : 'Super Admin') :
+                     currentUser.role === 'Admin' ? (isAr ? 'مدير عام مشرف • Admin' : 'Admin') :
+                     currentUser.role === 'Finance Manager' ? (isAr ? 'المدير المالي' : 'Finance Manager') :
+                     currentUser.role === 'Operations Manager' ? (isAr ? 'مدير التشغيل' : 'Operations Manager') :
+                     currentUser.role === 'Warehouse Manager' ? (isAr ? 'مدير المستودع' : 'Warehouse Manager') :
+                     currentUser.role === 'Customer Service' ? (isAr ? 'خدمة العملاء' : 'Customer Service') :
+                     currentUser.role === 'Technician' ? (isAr ? 'فني تركيبات' : 'Technician') :
+                     currentUser.role === 'Read Only Viewer' ? (isAr ? 'مراقب عام' : 'Viewer') :
+                     (isAr ? 'حساب عميل معتمد' : 'Verified Client')}
                   </span>
                   <strong className="text-white text-xs">{currentUser.name}</strong>
                 </div>

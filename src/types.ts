@@ -13,7 +13,9 @@ export type PageId =
   | 'digital'
   | 'portal'
   | 'about'
-  | 'contact';
+  | 'contact'
+  | 'track-repair'
+  | 'offers';
 
 export interface CompanyInfo {
   nameAr: string;
@@ -145,12 +147,14 @@ export interface LogoConfig {
   visibleInHero: boolean;
   visibleInFooter: boolean;
   visibleInMenu: boolean;
+  visibleInIntro?: boolean;
+  visibleInHeroStart?: boolean;
   animation: 'none' | 'spin-slow' | 'bounce-slow' | 'pulse-slow' | 'glow-breath' | 'slide-in';
   hoverEffect: 'none' | 'scale' | 'rotate' | 'brightness' | 'gold-shine';
   scrollEffect: 'none' | 'shrink' | 'fade-out' | 'skew';
 }
 
-export type UserRole = 'Super Admin' | 'Admin' | 'Manager' | 'Employee' | 'Client' | 'Visitor';
+export type UserRole = 'Super Admin' | 'Admin' | 'Finance Manager' | 'Operations Manager' | 'Warehouse Manager' | 'Customer Service' | 'Technician' | 'Read Only Viewer' | 'Client' | 'Visitor';
 
 export interface UserAccount {
   id: string;

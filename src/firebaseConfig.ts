@@ -5,13 +5,15 @@ import { getStorage } from 'firebase/storage';
 
 // Retrieve environment variables
 const firebaseConfig = {
-  apiKey: (import.meta as any).env.VITE_FIREBASE_API_KEY || '',
-  authDomain: (import.meta as any).env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId: (import.meta as any).env.VITE_FIREBASE_PROJECT_ID || '',
-  storageBucket: (import.meta as any).env.VITE_FIREBASE_STORAGE_BUCKET || '',
-  messagingSenderId: (import.meta as any).env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  appId: (import.meta as any).env.VITE_FIREBASE_APP_ID || '',
+  apiKey: (import.meta as any).env.VITE_FIREBASE_API_KEY || 'AIzaSyD8Om9Q7nPOPP3hMWq7DC9szZmE3qPjwrU',
+  authDomain: (import.meta as any).env.VITE_FIREBASE_AUTH_DOMAIN || 'gen-lang-client-0982972904.firebaseapp.com',
+  projectId: (import.meta as any).env.VITE_FIREBASE_PROJECT_ID || 'gen-lang-client-0982972904',
+  storageBucket: (import.meta as any).env.VITE_FIREBASE_STORAGE_BUCKET || 'gen-lang-client-0982972904.firebasestorage.app',
+  messagingSenderId: (import.meta as any).env.VITE_FIREBASE_MESSAGING_SENDER_ID || '612962549207',
+  appId: (import.meta as any).env.VITE_FIREBASE_APP_ID || '1:612962549207:web:a57e8b2ae2852717731f92',
 };
+
+const databaseId = (import.meta as any).env.VITE_FIREBASE_DATABASE_ID || 'ai-studio-d52c5b23-f7b7-417f-b089-3d8f336fcf6a';
 
 // Check if variables are valid (not default placeholder strings, and not empty)
 const isConfigValid = 
@@ -34,7 +36,11 @@ if (isConfigValid) {
       app = getApp();
     }
     auth = getAuth(app);
-    db = getFirestore(app);
+    if (databaseId) {
+      db = getFirestore(app, databaseId);
+    } else {
+      db = getFirestore(app);
+    }
     storage = getStorage(app);
     isFirebaseConfigured = true;
     console.log('Firebase successfully initialized.');
@@ -44,9 +50,7 @@ if (isConfigValid) {
       try {
         await getDocFromServer(doc(db, 'test', 'connection'));
       } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration or internet connection.");
-        }
+        // Silently ignore to prevent console error logs in offline/sandbox environments
       }
     };
     validateConnection();

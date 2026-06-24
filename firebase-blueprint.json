@@ -1,0 +1,176 @@
+{
+  "entities": {
+    "Material": {
+      "title": "Material",
+      "description": "Raw and finished products in warehouse inventory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nameAr": { "type": "string" },
+        "nameEn": { "type": "string" },
+        "category": { "type": "string" },
+        "stock": { "type": "number" },
+        "unitAr": { "type": "string" },
+        "unitEn": { "type": "string" },
+        "supplier": { "type": "string" },
+        "safetyLimit": { "type": "number" },
+        "costPerUnit": { "type": "number" },
+        "availableStock": { "type": "number" },
+        "reservedStock": { "type": "number" },
+        "incomingStock": { "type": "number" }
+      },
+      "required": ["id", "nameAr", "nameEn", "stock", "category"]
+    },
+    "Movement": {
+      "title": "Movement",
+      "description": "Stock movement tracking transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "materialId": { "type": "string" },
+        "materialName": { "type": "string" },
+        "type": { "type": "string", "enum": ["In", "Out"] },
+        "qty": { "type": "number" },
+        "notes": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "materialId", "type", "qty", "date"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Supplier contact information and credentials",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyName": { "type": "string" },
+        "contactPerson": { "type": "string" },
+        "mobileNumber": { "type": "string" },
+        "whatsApp": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "materialsSupplied": { "type": "string" },
+        "paymentTerms": { "type": "string" },
+        "supplierRating": { "type": "number" }
+      },
+      "required": ["id", "companyName", "contactPerson"]
+    },
+    "Purchase": {
+      "title": "Purchase",
+      "description": "Supplier purchase orders and invoices",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "supplierId": { "type": "string" },
+        "supplierName": { "type": "string" },
+        "type": { "type": "string", "enum": ["Purchase Order", "Supplier Invoice"] },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "date": { "type": "string" },
+        "items": { "type": "string" },
+        "outstandingBalance": { "type": "number" },
+        "paymentHistory": { "type": "string" }
+      },
+      "required": ["id", "supplierId", "type", "amount", "status"]
+    },
+    "Finance": {
+      "title": "Finance",
+      "description": "Central accounting journal ledgers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["Revenue", "Expense"] },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "payMethod": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "title", "type", "amount", "date"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Advertising agency projects and contracts workflow",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customer": { "type": "string" },
+        "projectCost": { "type": "number" },
+        "profitMargin": { "type": "number" },
+        "status": { "type": "string", "enum": ["New Lead", "Quotation Sent", "Approved", "In Production", "Ready", "Installed", "Completed"] },
+        "deliveryDate": { "type": "string" },
+        "titleAr": { "type": "string" },
+        "titleEn": { "type": "string" }
+      },
+      "required": ["id", "customer", "projectCost", "status"]
+    },
+    "LogoConfig": {
+      "title": "LogoConfig",
+      "description": "Upgraded system-wide multi-type logo settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "darkLogo": { "type": "string" },
+        "lightLogo": { "type": "string" },
+        "transparentLogo": { "type": "string" },
+        "svgLogo": { "type": "string" },
+        "faviconLogo": { "type": "string" },
+        "mobileLogo": { "type": "string" },
+        "sizeHeader": { "type": "number" },
+        "sizeMobileHeader": { "type": "number" },
+        "sizeFooter": { "type": "number" },
+        "sizeLoadingScreen": { "type": "number" },
+        "useDarkLogo": { "type": "boolean" }
+      },
+      "required": ["id"]
+    },
+    "WhatsAppConfig": {
+      "title": "WhatsAppConfig",
+      "description": "Floating WhatsApp support widget settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "number": { "type": "string" },
+        "position": { "type": "string", "enum": ["bottom-right", "bottom-left"] },
+        "color": { "type": "string" },
+        "text": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "greetingMessage": { "type": "string" }
+      },
+      "required": ["id", "number"]
+    }
+  },
+  "firestore": {
+    "materials": {
+      "schema": "Material",
+      "description": "Raw and finished production materials catalogue"
+    },
+    "movements": {
+      "schema": "Movement",
+      "description": "Inventory stock adjustments and withdrawals"
+    },
+    "suppliers": {
+      "schema": "Supplier",
+      "description": "Suppliers profiles directory"
+    },
+    "purchases": {
+      "schema": "Purchase",
+      "description": "Supplier purchase orders and invoices ledger"
+    },
+    "finance": {
+      "schema": "Finance",
+      "description": "Accounting journal ledgers and transactions"
+    },
+    "projects": {
+      "schema": "Project",
+      "description": "Client sign manufacturing workflow states"
+    },
+    "logos": {
+      "schema": "LogoConfig",
+      "description": "Dedicated agency brand multi-format logo center"
+    },
+    "whatsapp": {
+      "schema": "WhatsAppConfig",
+      "description": "Floating contact click-to-chat settings"
+    }
+  }
+}

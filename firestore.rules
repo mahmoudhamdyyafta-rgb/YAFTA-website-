@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 2. Materials Collection Rules
+    match /materials/{materialId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // 3. Movements Collection Rules
+    match /movements/{movementId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // 4. Suppliers Collection Rules
+    match /suppliers/{supplierId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // 5. Purchases Collection Rules
+    match /purchases/{purchaseId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // 6. Finance Collection Rules
+    match /finance/{recordId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // 7. Projects Collection Rules
+    match /projects/{projectId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // 8. Logos Collection Rules
+    match /logos/{logoId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // 9. WhatsApp Collection Rules
+    match /whatsapp/{configId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // 10. Site Settings Collection Rules
+    match /siteSettings/{configId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+  }
+}

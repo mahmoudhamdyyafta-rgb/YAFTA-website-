@@ -25,21 +25,21 @@ interface Props {
   canEdit: boolean;
 }
 
+import { subscribeToCollection, saveDocument } from '../../utils/firebaseSync';
+
+const DEFAULT_RECORDS: FinanceRecord[] = [
+  { id: 'tx-1', title: 'Payment for Cladding Facade - Elite Care', type: 'Revenue', amount: 85000, category: 'Commercial Signage', payMethod: 'Bank Transfer', date: '2026-06-18' },
+  { id: 'tx-2', title: 'Purchase of Samsung 12V LED chips bulk #90', type: 'Expense', amount: 32000, category: 'Production Materials', payMethod: 'Credit Card', date: '2026-06-15' },
+  { id: 'tx-3', title: 'Design branding deposit - Y Burger', type: 'Revenue', amount: 45000, category: 'Graphics Design Service', payMethod: 'Cash', date: '2026-06-12' },
+  { id: 'tx-4', title: 'Monthly Rental for Workshop CNC area Cairo', type: 'Expense', amount: 18000, category: 'Operations & Rent', payMethod: 'Bank Transfer', date: '2026-06-01' },
+  { id: 'tx-5', title: 'Neon Flex materials custom shipment import', type: 'Expense', amount: 11500, category: 'Workshop cons.', payMethod: 'Bank Transfer', date: '2026-06-05' },
+  { id: 'tx-6', title: 'Installation logistics fuel and crane rental Dokki', type: 'Expense', amount: 6500, category: 'Logistics', payMethod: 'Cash', date: '2026-06-14' },
+  { id: 'tx-7', title: 'Full payment - Signature Hair Salon backlit signage', type: 'Revenue', amount: 25000, category: 'Commercial Signage', payMethod: 'Bank Transfer', date: '2026-06-10' }
+];
+
 export default function FinancialModule({ isAr, canEdit }: Props) {
   // Financial Records (Expenses & Revenues)
-  const [records, setRecords] = useState<FinanceRecord[]>(() => {
-    const saved = localStorage.getItem('yafta_erp_finance');
-    if (saved) return JSON.parse(saved);
-    return [
-      { id: 'tx-1', title: 'Payment for Cladding Facade - Elite Care', type: 'Revenue', amount: 85000, category: 'Commercial Signage', payMethod: 'Bank Transfer', date: '2026-06-18' },
-      { id: 'tx-2', title: 'Purchase of Samsung 12V LED chips bulk #90', type: 'Expense', amount: 32000, category: 'Production Materials', payMethod: 'Credit Card', date: '2026-06-15' },
-      { id: 'tx-3', title: 'Design branding deposit - Y Burger', type: 'Revenue', amount: 45000, category: 'Graphics Design Service', payMethod: 'Cash', date: '2026-06-12' },
-      { id: 'tx-4', title: 'Monthly Rental for Workshop CNC area Cairo', type: 'Expense', amount: 18000, category: 'Operations & Rent', payMethod: 'Bank Transfer', date: '2026-06-01' },
-      { id: 'tx-5', title: 'Neon Flex materials custom shipment import', type: 'Expense', amount: 11500, category: 'Workshop cons.', payMethod: 'Bank Transfer', date: '2026-06-05' },
-      { id: 'tx-6', title: 'Installation logistics fuel and crane rental Dokki', type: 'Expense', amount: 6500, category: 'Logistics', payMethod: 'Cash', date: '2026-06-14' },
-      { id: 'tx-7', title: 'Full payment - Signature Hair Salon backlit signage', type: 'Revenue', amount: 25000, category: 'Commercial Signage', payMethod: 'Bank Transfer', date: '2026-06-10' }
-    ];
-  });
+  const [records, setRecords] = useState<FinanceRecord[]>([]);
 
   const [filterType, setFilterType] = useState<'all' | 'Revenue' | 'Expense'>('all');
   const [addingRecord, setAddingRecord] = useState(false);
@@ -52,14 +52,16 @@ export default function FinancialModule({ isAr, canEdit }: Props) {
   const [payMethod, setPayMethod] = useState<'Bank Transfer' | 'Cash' | 'Credit Card' | 'Installment'>('Bank Transfer');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
+  // Setup Firestore live-synced subscription
+  useEffect(() => {
+    const unsubscribe = subscribeToCollection<FinanceRecord>('finance', 'yafta_erp_finance', DEFAULT_RECORDS, setRecords);
+    return unsubscribe;
+  }, []);
+
   // Aggregate stats
   const totalRevenue = records.filter(r => r.type === 'Revenue').reduce((sum, r) => sum + r.amount, 0);
   const totalExpense = records.filter(r => r.type === 'Expense').reduce((sum, r) => sum + r.amount, 0);
   const netProfit = totalRevenue - totalExpense;
-
-  useEffect(() => {
-    localStorage.setItem('yafta_erp_finance', JSON.stringify(records));
-  }, [records]);
 
   const handleCreateRecord = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +77,7 @@ export default function FinancialModule({ isAr, canEdit }: Props) {
       date
     };
 
-    setRecords([newRecord, ...records]);
+    saveDocument<FinanceRecord>('finance', 'yafta_erp_finance', newRecord.id, newRecord);
     setTitle('');
     setAddingRecord(false);
     alert(isAr ? 'تم تقييد القيد المالي بالحسابات المعتمدة لـ يافطة!' : 'Financial record posted to general ledger.');

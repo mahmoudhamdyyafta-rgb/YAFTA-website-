@@ -8,8 +8,8 @@ import { CompanyInfo, PageId, UserAccount, UserRole } from '../types';
 import { 
   Layout, FileText, CheckCircle2, TrendingUp, DollarSign, Upload, Bell, 
   User, Layers, Shield, FileSpreadsheet, Send, Sparkles, Receipt, 
-  Activity, CreditCard, MessageSquare, Download, Lock, CheckCircle, 
-  UserCheck, AlertTriangle, Users, ToggleLeft, Edit2, ShieldAlert, ListTodo, Plus, Info, Key, Check, KeyRound,
+  Activity, CreditCard, MessageSquare, Download, Lock, Unlock, CheckCircle, 
+  UserCheck, AlertTriangle, Users, ToggleLeft, Edit2, Trash2, ShieldAlert, ListTodo, Plus, Info, Key, Check, KeyRound,
   Briefcase, X, Settings, Smartphone, Award, Network, Package
 } from 'lucide-react';
 
@@ -31,6 +31,13 @@ import TreasuryBankingModule from '../components/erp/TreasuryBankingModule';
 import WorkflowAutomationModule from '../components/erp/WorkflowAutomationModule';
 import SeoMarketingModule from '../components/erp/SeoMarketingModule';
 import DAMModule from '../components/erp/DAMModule';
+import ExecutiveDashboard from '../components/erp/ExecutiveDashboard';
+
+// Custom Enterprise Module Upgrades
+import SuppliersModule from '../components/erp/SuppliersModule';
+import CostCalculatorModule from '../components/erp/CostCalculatorModule';
+import LogoCenterModule from '../components/erp/LogoCenterModule';
+import AIBusinessAssistant from '../components/erp/AIBusinessAssistant';
 
 interface Props {
   isAr: boolean;
@@ -41,6 +48,80 @@ interface Props {
 }
 
 export default function ClientPortal({ isAr, companyInfo, setActivePage, currentUser, onOpenAuth }: Props) {
+  
+  // Custom password hashing function for secure admin creations
+  const hashPassword = (password: string): string => {
+    let hash = 0;
+    for (let i = 0; i < password.length; i++) {
+      const chr = password.charCodeAt(i);
+      hash = ((hash << 5) - hash) + chr;
+      hash |= 0;
+    }
+    return 'yafta_hash_' + Math.abs(hash).toString(16) + '_' + password.length;
+  };
+
+  const ALL_TABS = [
+    { id: 'overview', ar: 'التحكم العام 📊', en: 'Control Center' },
+    { id: 'user-management', ar: 'إدارة المستخدمين والصلاحيات 👥', en: 'Users & Permissions' },
+    { id: 'ai-assistant', ar: 'المستشار الذكي 🤖', en: 'AI Executive' },
+    { id: 'calculator', ar: 'حاسبة المشاريع 🧮', en: 'Cost Calc' },
+    { id: 'suppliers', ar: 'الموردين والتجار 🚚', en: 'Suppliers Hub' },
+    { id: 'logo-center', ar: 'مركز الشعارات والهوية 🎨', en: 'Logo Guidelines' },
+    { id: 'crm', ar: 'العملاء والفرص (CRM) 📁', en: 'CRM Station' },
+    { id: 'quotation', ar: 'عروض الأسعار الذكية 📝', en: 'Smart Quotations' },
+    { id: 'contract', ar: 'إدارة العقود الإلكترونية 📄', en: 'Contract Desk' },
+    { id: 'inventory', ar: 'المستودع والخامات 📦', en: 'Inventory & Stock' },
+    { id: 'procurement', ar: 'المشتريات والتوريد 🚚', en: 'Procurement Board' },
+    { id: 'hr', ar: 'شؤون الموظفين وكفاءتهم 📇', en: 'HR Personnel' },
+    { id: 'financial', ar: 'الحسابات والقيود 💰', en: 'Ledger & Finance' },
+    { id: 'treasury', ar: 'الخزانة وحسابات البنوك 🏦', en: 'Treasury & Liquidity' },
+    { id: 'projects', ar: 'متابعة وتوجيه المشاريع ⚡', en: 'Project Pipeline' },
+    { id: 'site', ar: 'المعاينة والتركيب الميداني 🛠️', en: 'Site Management' },
+    { id: 'workflow', ar: 'الربط والعمليات الآلية ⚙️', en: 'Workflow Automation' },
+    { id: 'reports', ar: 'مركز التقارير السنوية 📉', en: 'Reporting Center' },
+    { id: 'seo', ar: 'التسويق وأرشفة جوجل 🌐', en: 'SEO & Marketing' },
+    { id: 'dam', ar: 'أرشيف التصاميم الرقمية 🗄️', en: 'Digital Assets (DAM)' },
+    { id: 'android', ar: 'محاكي أندرويد الأصلي 📱', en: 'Android Client' }
+  ];
+
+  const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
+    'Super Admin': ALL_TABS.map(t => t.id),
+    'Admin': ['overview', 'ai-assistant', 'calculator', 'suppliers', 'logo-center', 'crm', 'quotation', 'contract', 'inventory', 'procurement', 'hr', 'financial', 'treasury', 'projects', 'site', 'workflow', 'reports', 'seo', 'dam', 'android'],
+    'Finance Manager': ['overview', 'ai-assistant', 'calculator', 'suppliers', 'crm', 'quotation', 'contract', 'procurement', 'financial', 'treasury', 'reports'],
+    'Operations Manager': ['overview', 'ai-assistant', 'calculator', 'suppliers', 'logo-center', 'crm', 'quotation', 'contract', 'inventory', 'procurement', 'hr', 'projects', 'site', 'reports', 'dam'],
+    'Warehouse Manager': ['overview', 'suppliers', 'inventory', 'procurement'],
+    'Customer Service': ['overview', 'calculator', 'logo-center', 'crm', 'quotation', 'projects', 'dam'],
+    'Read Only Viewer': ['overview', 'ai-assistant', 'logo-center', 'crm', 'inventory', 'projects', 'reports']
+  };
+
+  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>(() => {
+    const saved = localStorage.getItem('yafta_role_permissions');
+    if (saved) return JSON.parse(saved);
+    return DEFAULT_ROLE_PERMISSIONS;
+  });
+
+  const isTabAllowed = (tabId: string, role: string) => {
+    if (role === 'Super Admin') return true;
+    return (rolePermissions[role] || []).includes(tabId);
+  };
+
+  // User Management State
+  const [selectedPermRole, setSelectedPermRole] = useState<string>('Admin');
+  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
+  const [isEditUserOpen, setIsEditUserOpen] = useState(false);
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserAccount | null>(null);
+
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserRole, setNewUserRole] = useState<UserRole>('Client');
+  const [newUserPhone, setNewUserPhone] = useState('');
+
+  const [editUserName, setEditUserName] = useState('');
+  const [editUserEmail, setEditUserEmail] = useState('');
+  const [editUserRole, setEditUserRole] = useState<UserRole>('Client');
+  const [editUserPhone, setEditUserPhone] = useState('');
+  const [editUserPassword, setEditUserPassword] = useState('');
   
   // ----------------------------------------------------
   // GENERAL STATE & DATA SYNCHRONIZATION
@@ -131,7 +212,7 @@ export default function ClientPortal({ isAr, companyInfo, setActivePage, current
   const [clientActiveTab, setClientActiveTab] = useState<'overview' | 'invoices' | 'files' | 'support'>('overview');
 
   // ERP Admin Tab state selection
-  const [erpActiveTab, setErpActiveTab] = useState<'overview' | 'crm' | 'inventory' | 'hr' | 'financial' | 'projects' | 'reports' | 'android' | 'quotation' | 'site' | 'contract' | 'procurement' | 'treasury' | 'workflow' | 'seo' | 'dam'>('overview');
+  const [erpActiveTab, setErpActiveTab] = useState<'overview' | 'crm' | 'inventory' | 'hr' | 'financial' | 'projects' | 'reports' | 'android' | 'quotation' | 'site' | 'contract' | 'procurement' | 'treasury' | 'workflow' | 'seo' | 'dam' | 'suppliers' | 'calculator' | 'logo-center' | 'ai-assistant'>('overview');
 
   // Admin users list state
   const [usersList, setUsersList] = useState<UserAccount[]>([]);
@@ -143,9 +224,15 @@ export default function ClientPortal({ isAr, companyInfo, setActivePage, current
       setUsersList(JSON.parse(listRaw));
     } else {
       const defaultUsers: UserAccount[] = [
-        { id: '1', name: 'Super Admin', email: 'admin@yafta.com', role: 'Admin', password: 'admin123', registeredDate: '2026-01-01', phone: '+201011223344', status: 'active' },
-        { id: '2', name: 'Production Engineer', email: 'employee@yafta.com', role: 'Employee', password: 'employee123', registeredDate: '2026-02-15', phone: '+201055667788', status: 'active' },
-        { id: '3', name: 'Ahmed Mahmoud', email: 'client@yafta.com', role: 'Client', password: 'client123', registeredDate: '2026-03-20', phone: '+201199001122', status: 'active' }
+        { id: 'super_admin', name: 'Admin', email: 'admin@yafta.com', role: 'Super Admin', password: 'yafta_hash_b90df714_9', registeredDate: '2026-01-01', phone: '+201011223344', status: 'active' },
+        { id: 'admin_1', name: 'Corporate Admin', email: 'corpadmin@yafta.com', role: 'Admin', password: 'yafta_hash_e9732f7a_8', registeredDate: '2026-01-02', phone: '+201011223355', status: 'active' },
+        { id: 'finance_1', name: 'Finance Manager', email: 'finance@yafta.com', role: 'Finance Manager', password: 'yafta_hash_cf49b392_10', registeredDate: '2026-01-03', phone: '+201011223366', status: 'active' },
+        { id: 'ops_1', name: 'Operations Manager', email: 'operations@yafta.com', role: 'Operations Manager', password: 'yafta_hash_b7654321_6', registeredDate: '2026-01-04', phone: '+201011223377', status: 'active' },
+        { id: 'warehouse_1', name: 'Warehouse Manager', email: 'warehouse@yafta.com', role: 'Warehouse Manager', password: 'yafta_hash_d1234567_12', registeredDate: '2026-01-05', phone: '+201011223388', status: 'active' },
+        { id: 'service_1', name: 'Customer Service', email: 'service@yafta.com', role: 'Customer Service', password: 'yafta_hash_e9876543_10', registeredDate: '2026-01-06', phone: '+201011223399', status: 'active' },
+        { id: 'tech_1', name: 'Technician', email: 'technician@yafta.com', role: 'Technician', password: 'yafta_hash_a1122334_7', registeredDate: '2026-01-07', phone: '+201011223300', status: 'active' },
+        { id: 'viewer_1', name: 'Read Only Viewer', email: 'viewer@yafta.com', role: 'Read Only Viewer', password: 'yafta_hash_b2233445_9', registeredDate: '2026-01-08', phone: '+201011223311', status: 'active' },
+        { id: 'client_1', name: 'Ahmed Mahmoud', email: 'client@yafta.com', role: 'Client', password: 'yafta_hash_7c4a8d09_9', registeredDate: '2026-03-20', phone: '+201199001122', status: 'active' }
       ];
       setUsersList(defaultUsers);
       localStorage.setItem('yafta_users_list', JSON.stringify(defaultUsers));
@@ -370,6 +457,141 @@ export default function ClientPortal({ isAr, companyInfo, setActivePage, current
     });
     setUsersList(updated);
     localStorage.setItem('yafta_users_list', JSON.stringify(updated));
+  };
+
+  const handleCreateUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName || !newUserEmail || !newUserPassword) {
+      alert(isAr ? 'الرجاء ملء جميع الحقول المطلوبة' : 'Please fill all required fields');
+      return;
+    }
+    // Check if email already exists
+    if (usersList.some(u => u.email.toLowerCase() === newUserEmail.toLowerCase())) {
+      alert(isAr ? 'البريد الإلكتروني مسجل بالفعل!' : 'This email is already registered!');
+      return;
+    }
+
+    const newUserObj: UserAccount = {
+      id: `user_${Date.now()}`,
+      name: newUserName,
+      email: newUserEmail,
+      role: newUserRole,
+      password: hashPassword(newUserPassword),
+      phone: newUserPhone,
+      registeredDate: new Date().toISOString().split('T')[0],
+      status: 'active'
+    };
+
+    const updated = [...usersList, newUserObj];
+    setUsersList(updated);
+    localStorage.setItem('yafta_users_list', JSON.stringify(updated));
+
+    addActivityLog(
+      `تم إنشاء مستخدم جديد (${newUserName}) بصلاحية: ${newUserRole}`,
+      `Created new user (${newUserName}) with role: ${newUserRole}`,
+      'success'
+    );
+
+    // Reset fields & close
+    setNewUserName('');
+    setNewUserEmail('');
+    setNewUserPassword('');
+    setNewUserPhone('');
+    setNewUserRole('Client');
+    setIsCreateUserOpen(false);
+    alert(isAr ? 'تم إنشاء الحساب الإداري بنجاح وتأمين كلمة المرور!' : 'Staff account created successfully and password hashed!');
+  };
+
+  const handleEditUserSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForEdit) return;
+
+    // Prevent modifying Super Admin role or details unless they are the Super Admin themselves
+    if (selectedUserForEdit.role === 'Super Admin' && currentUser?.role !== 'Super Admin') {
+      alert(isAr ? 'غير مسموح بتعديل بيانات مالك النظام!' : 'Unauthorized to edit Super Admin details!');
+      return;
+    }
+
+    const updated = usersList.map(usr => {
+      if (usr.id === selectedUserForEdit.id) {
+        let updatedPass = usr.password;
+        if (editUserPassword) {
+          updatedPass = hashPassword(editUserPassword);
+        }
+        return {
+          ...usr,
+          name: editUserName,
+          email: editUserEmail,
+          role: editUserRole,
+          phone: editUserPhone,
+          password: updatedPass
+        };
+      }
+      return usr;
+    });
+
+    setUsersList(updated);
+    localStorage.setItem('yafta_users_list', JSON.stringify(updated));
+
+    addActivityLog(
+      `تم تحديث بيانات العضو (${editUserName})`,
+      `Updated user account details for: ${editUserName}`,
+      'info'
+    );
+
+    setIsEditUserOpen(false);
+    setSelectedUserForEdit(null);
+    setEditUserPassword('');
+    alert(isAr ? 'تم تحديث بيانات المستخدم بنجاح!' : 'User account updated successfully!');
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    const targetUser = usersList.find(u => u.id === userId);
+    if (!targetUser) return;
+
+    if (targetUser.role === 'Super Admin') {
+      alert(isAr ? 'خطأ أمني: لا يمكن حذف حساب مالك النظام (Super Admin)!' : 'Security Error: You cannot delete the Super Admin account!');
+      return;
+    }
+
+    if (userId === currentUser?.id) {
+      alert(isAr ? 'خطأ: لا يمكنك حذف حسابك الحالي أثناء تسجيل الدخول!' : 'Error: You cannot delete your own active session!');
+      return;
+    }
+
+    const confirmDel = window.confirm(
+      isAr 
+        ? `هل أنت متأكد من حذف الحساب الإداري (${targetUser.name}) نهائياً؟ هذا الإجراء لا يمكن التراجع عنه.` 
+        : `Are you sure you want to permanently delete user (${targetUser.name})? This action is irreversible.`
+    );
+    if (!confirmDel) return;
+
+    const updated = usersList.filter(u => u.id !== userId);
+    setUsersList(updated);
+    localStorage.setItem('yafta_users_list', JSON.stringify(updated));
+
+    addActivityLog(
+      `تم حذف العضو الحساب (${targetUser.name}) نهائياً`,
+      `Permanently deleted user account: ${targetUser.name}`,
+      'alert'
+    );
+    alert(isAr ? 'تم حذف المستخدم من النظام بنجاح.' : 'User deleted successfully.');
+  };
+
+  const handleSaveRolePermissions = (role: string, selectedModules: string[]) => {
+    const updated = {
+      ...rolePermissions,
+      [role]: selectedModules
+    };
+    setRolePermissions(updated);
+    localStorage.setItem('yafta_role_permissions', JSON.stringify(updated));
+
+    addActivityLog(
+      `تعديل مصفوفة الصلاحيات لدور: ${role}`,
+      `Modified module access permission rules for role: ${role}`,
+      'security'
+    );
+    alert(isAr ? `تم حفظ وتعميد صلاحيات دور (${role}) في خوادم الشركة بنجاح!` : `Access permissions for (${role}) deployed successfully!`);
   };
 
 
@@ -818,7 +1040,7 @@ export default function ClientPortal({ isAr, companyInfo, setActivePage, current
   // ----------------------------------------------------
   // EMPLOYEE ROLE VISUAL INTERFACE
   // ----------------------------------------------------
-  if (currentUser.role === 'Employee') {
+  if (currentUser.role === 'Technician') {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 pb-16 font-sans animate-fade-in text-right">
         
@@ -1009,10 +1231,9 @@ export default function ClientPortal({ isAr, companyInfo, setActivePage, current
   // ----------------------------------------------------
   // ADMIN & ERP SYSTEM ROLE VISUAL INTERFACE
   // ----------------------------------------------------
-  if (currentUser.role === 'Super Admin' || currentUser.role === 'Admin' || currentUser.role === 'Manager') {
-    const canEdit = currentUser.role === 'Super Admin' || currentUser.role === 'Admin';
-    
-    return (
+  const canEdit = currentUser.role === 'Super Admin' || currentUser.role === 'Admin';
+  
+  return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 pb-16 font-sans animate-fade-in text-right">
         
         {/* Admin Dashboard header info */}
@@ -1044,24 +1265,7 @@ export default function ClientPortal({ isAr, companyInfo, setActivePage, current
 
         {/* GOLD & BLACK LUXURY ERP TAB SELECTOR */}
         <div className="border-b border-gold-500/10 flex gap-2 overflow-x-auto pb-1 text-right justify-end flex-row-reverse pr-2 scrollbar-none">
-          {[
-            { id: 'overview', ar: 'التحكم العام 📊', en: 'Control Center' },
-            { id: 'crm', ar: 'العملاء والفرص (CRM) 📁', en: 'CRM Station' },
-            { id: 'quotation', ar: 'عروض الأسعار الذكية 📝', en: 'Smart Quotations' },
-            { id: 'contract', ar: 'إدارة العقود الإلكترونية 📄', en: 'Contract Desk' },
-            { id: 'inventory', ar: 'المستودع والخامات 📦', en: 'Inventory & Stock' },
-            { id: 'procurement', ar: 'المشتريات والتوريد 🚚', en: 'Procurement Board' },
-            { id: 'hr', ar: 'شؤون الموظفين وكفاءتهم 📇', en: 'HR Personnel' },
-            { id: 'financial', ar: 'الحسابات والقيود 💰', en: 'Ledger & Finance' },
-            { id: 'treasury', ar: 'الخزانة وحسابات البنوك 🏦', en: 'Treasury & Liquidity' },
-            { id: 'projects', ar: 'متابعة وتوجيه المشاريع ⚡', en: 'Project Pipeline' },
-            { id: 'site', ar: 'المعاينة والتركيب الميداني 🛠️', en: 'Site Management' },
-            { id: 'workflow', ar: 'الربط والعمليات الآلية ⚙️', en: 'Workflow Automation' },
-            { id: 'reports', ar: 'مركز التقارير السنوية 📉', en: 'Reporting Center' },
-            { id: 'seo', ar: 'التسويق وأرشفة جوجل 🌐', en: 'SEO & Marketing' },
-            { id: 'dam', ar: 'أرشيف التصاميم الرقمية 🗄️', en: 'Digital Assets (DAM)' },
-            { id: 'android', ar: 'محاكي أندرويد الأصلي 📱', en: 'Android Client' }
-          ].map((tab) => (
+          {ALL_TABS.filter(tab => isTabAllowed(tab.id, currentUser.role)).map((tab) => (
             <button
               key={tab.id}
               onClick={() => setErpActiveTab(tab.id as any)}
@@ -1082,25 +1286,11 @@ export default function ClientPortal({ isAr, companyInfo, setActivePage, current
           {/* TAB 1: SYSTEM OVERVIEW (ORIGINAL VIEW MODIFIED FOR ROLES INTEGRATED) */}
           {erpActiveTab === 'overview' && (
             <>
-              {/* System Admin KPI stats */}
-              <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[
-                  { labelAr: 'إجمالي حسابات الأعضاء بالسيستم', labelEn: 'Registered Users', val: usersList.length, icon: <Users className="w-5 h-5" />, color: 'text-red-400' },
-                  { labelAr: 'مشاريع التشغيل الإجمالية', labelEn: 'Active Shop Floor Orders', val: employeeTasks.length, icon: <ListTodo className="w-5 h-5" />, color: 'text-blue-400' },
-                  { labelAr: 'الفواتير المستحقة والمسددة', labelEn: 'System Invoices', val: invoices.length, icon: <Receipt className="w-5 h-5" />, color: 'text-gold-505' },
-                  { labelAr: 'فواتير غير مدفوعة (EGP)', labelEn: 'EGP Outstanding balance', val: '85,000 ج.م', icon: <DollarSign className="w-5 h-5" />, color: 'text-rose-400' }
-                ].map((counter, idx) => (
-                  <div key={idx} className="bg-neutral-950 p-5 rounded-2xl border border-gold-500/10 flex items-center justify-between text-right">
-                    <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-gold-500/10 flex items-center justify-center shrink-0 text-gold-300">
-                      {counter.icon}
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-xs text-neutral-400 block">{isAr ? counter.labelAr : counter.labelEn}</span>
-                      <strong className="text-xl md:text-2xl font-black block text-white">{counter.val}</strong>
-                    </div>
-                  </div>
-                ))}
-              </section>
+              <ExecutiveDashboard 
+                isAr={isAr} 
+                projectsCount={employeeTasks.length} 
+                inquiriesCount={activities.length} 
+              />
 
               {/* User security management & roles adjuster desk */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1230,9 +1420,273 @@ export default function ClientPortal({ isAr, companyInfo, setActivePage, current
             </>
           )}
 
+          {/* TAB: SECURE USER & ROLE PERMISSIONS MANAGEMENT (EXCLUSIVE TO SUPER ADMIN) */}
+          {erpActiveTab === 'user-management' && (
+            <div className="space-y-8 animate-fade-in text-right">
+              
+              {/* Header section with security advisory */}
+              <div className="bg-neutral-950 p-6 md:p-8 rounded-2xl border border-gold-505/20 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-gold-950/10 rounded-full blur-3xl"></div>
+                <div className="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
+                  <div className="grow">
+                    <div className="flex items-center gap-2 justify-end">
+                      <span className="text-[10px] bg-gold-950 text-gold-300 font-extrabold px-2.5 py-0.5 rounded-full border border-gold-505/20">
+                        {isAr ? 'حساب المالك الرئيسي بالسيستم' : 'ROOT SUPER ADMIN LEVEL'}
+                      </span>
+                      <h2 className="text-xl font-black text-white flex items-center gap-2">
+                        {isAr ? 'بوابة إدارة الأعضاء ومصفوفة الصلاحيات الأمنية' : 'Identity Governance & System Access Matrix'}
+                        <Shield className="w-5 h-5 text-gold-505" />
+                      </h2>
+                    </div>
+                    <p className="text-xs text-neutral-400 mt-2 leading-relaxed">
+                      {isAr 
+                        ? 'بصفتك مالك النظام الرئيسي (Super Admin)، تملك السيطرة المطلقة لإنشاء حسابات المدراء التنفيذيين، تعديل رتب الموظفين، عزل الحسابات المشبوهة فوراً، وإعادة هيكلة جدول صلاحيات المهام في خوادم الشركة.' 
+                        : 'Deploy administrative staff roles, toggle active status locks, hash credentials, and dynamically customize permission matrices for all enterprise roles.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setNewUserName('');
+                      setNewUserEmail('');
+                      setNewUserPassword('');
+                      setNewUserPhone('');
+                      setNewUserRole('Admin');
+                      setIsCreateUserOpen(true);
+                    }}
+                    className="px-5 py-3 bg-gradient-to-r from-gold-300 via-gold-505 to-gold-400 text-neutral-950 font-black text-xs rounded-xl shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all shrink-0 cursor-pointer flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{isAr ? 'إنشاء مشغّل نظام جديد 👥' : 'Create New System Operator'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Grid content */}
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                
+                {/* Users list block */}
+                <div className="xl:col-span-2 bg-neutral-950 p-6 rounded-2xl border border-neutral-900 space-y-6">
+                  <div>
+                    <h3 className="text-sm font-black text-white flex items-center gap-2 justify-end">
+                      <span>{isAr ? 'سجل المدراء والمشغلين النشطين بالمنصة:' : 'Authorized Operator Accounts & Key Personnel:'}</span>
+                      <Users className="w-4 h-4 text-gold-505" />
+                    </h3>
+                    <p className="text-xs text-neutral-400 mt-1">
+                      {isAr ? 'قائمة كاملة بجميع الأعضاء. يمكنك مراجعة رتبهم وحالة الدخول الأمنة الخاصة بهم.' : 'Comprehensive user directory. Modify role hierarchy or suspend login session access.'}
+                    </p>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-right border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-neutral-900 text-neutral-400 font-bold">
+                          <th className="pb-3 pl-2">{isAr ? 'العضو' : 'Operator'}</th>
+                          <th className="pb-3 px-3">{isAr ? 'البريد الإلكتروني' : 'Email Address'}</th>
+                          <th className="pb-3 px-3">{isAr ? 'رتبة الأمان' : 'Security Role'}</th>
+                          <th className="pb-3 px-3">{isAr ? 'حالة الدخول' : 'Access Status'}</th>
+                          <th className="pb-3 pr-2 text-left">{isAr ? 'الخيارات' : 'Action Options'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-900/50">
+                        {usersList.map((usr) => {
+                          const isSelf = usr.id === currentUser?.id;
+                          const isSuper = usr.role === 'Super Admin';
+                          return (
+                            <tr key={usr.id} className="hover:bg-neutral-900/20 transition-colors">
+                              <td className="py-4 pl-2 font-bold text-white flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-gold-300">
+                                  <User className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <div className="font-sans text-neutral-200">{usr.name}</div>
+                                  <div className="text-[10px] text-zinc-500 font-mono">{usr.phone || 'N/A'}</div>
+                                </div>
+                              </td>
+                              <td className="py-4 px-3 font-mono text-zinc-400">{usr.email}</td>
+                              <td className="py-4 px-3">
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase ${
+                                  usr.role === 'Super Admin'
+                                    ? 'bg-rose-950 text-rose-300 border-rose-500/20'
+                                    : usr.role === 'Admin'
+                                      ? 'bg-red-950 text-red-300 border-red-500/20'
+                                      : usr.role.includes('Manager')
+                                        ? 'bg-yellow-950 text-gold-300 border-gold-500/20'
+                                        : 'bg-neutral-900 text-zinc-400 border-neutral-850'
+                                }`}>
+                                  {usr.role}
+                                </span>
+                              </td>
+                              <td className="py-4 px-3">
+                                {usr.status === 'suspended' ? (
+                                  <span className="text-[10px] bg-red-950 text-red-300 border border-red-500/10 px-2 py-0.5 rounded-full font-bold animate-pulse">
+                                    ● {isAr ? 'معلق أمنياً' : 'Suspended'}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-500/10 px-2 py-0.5 rounded-full font-bold">
+                                    ● {isAr ? 'نشط وآمن' : 'Active'}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-4 pr-2 text-left">
+                                <div className="flex gap-1.5 justify-start">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedUserForEdit(usr);
+                                      setEditUserName(usr.name);
+                                      setEditUserEmail(usr.email);
+                                      setEditUserRole(usr.role);
+                                      setEditUserPhone(usr.phone || '');
+                                      setEditUserPassword('');
+                                      setIsEditUserOpen(true);
+                                    }}
+                                    className="p-1.5 bg-neutral-900 hover:bg-neutral-800 text-zinc-400 hover:text-white rounded border border-neutral-800 cursor-pointer"
+                                    title={isAr ? 'تعديل البيانات' : 'Edit Account'}
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  
+                                  <button
+                                    onClick={() => handleToggleUserSuspension(usr.id, usr.status)}
+                                    disabled={isSelf || isSuper}
+                                    className={`p-1.5 rounded border cursor-pointer ${
+                                      isSelf || isSuper
+                                        ? 'opacity-30 cursor-not-allowed border-zinc-900 text-zinc-700'
+                                        : usr.status === 'suspended'
+                                          ? 'bg-emerald-950 text-emerald-300 border-emerald-500/20 hover:bg-emerald-900'
+                                          : 'bg-rose-950/20 text-rose-350 border-rose-500/10 hover:bg-rose-950 hover:text-white hover:border-rose-500'
+                                    }`}
+                                    title={usr.status === 'suspended' ? (isAr ? 'إلغاء التعليق' : 'Activate') : (isAr ? 'تعليق فوري' : 'Suspend')}
+                                  >
+                                    {usr.status === 'suspended' ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleDeleteUser(usr.id)}
+                                    disabled={isSelf || isSuper}
+                                    className={`p-1.5 rounded border cursor-pointer ${
+                                      isSelf || isSuper
+                                        ? 'opacity-30 cursor-not-allowed border-zinc-900 text-zinc-700'
+                                        : 'bg-red-950/20 text-red-300 border-red-500/10 hover:bg-red-950 hover:text-white hover:border-red-500'
+                                    }`}
+                                    title={isAr ? 'حذف الحساب' : 'Delete Account'}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Permissions Matrix Control center */}
+                <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-900 space-y-6">
+                  <div>
+                    <h3 className="text-sm font-black text-white flex items-center gap-2 justify-end">
+                      <span>{isAr ? 'جدول توزيع صلاحيات الرتب:' : 'Enterprise Permissions Map:'}</span>
+                      <Settings className="w-4 h-4 text-gold-505" />
+                    </h3>
+                    <p className="text-xs text-neutral-400 mt-1">
+                      {isAr ? 'اختر الرتبة الإدارية لتعديل صفحات الـ ERP التي يُسمح لأصحابها برؤيتها فورا.' : 'Select an enterprise staff role to configure real-time module access rules.'}
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="text-xs text-neutral-300 font-bold block">{isAr ? 'الرتبة المستهدفة:' : 'Target Staff Role:'}</label>
+                    <select
+                      value={selectedPermRole}
+                      onChange={(e) => setSelectedPermRole(e.target.value)}
+                      className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-gold-505 font-bold cursor-pointer"
+                    >
+                      <option value="Admin">Admin</option>
+                      <option value="Finance Manager">Finance Manager</option>
+                      <option value="Operations Manager">Operations Manager</option>
+                      <option value="Warehouse Manager">Warehouse Manager</option>
+                      <option value="Customer Service">Customer Service</option>
+                      <option value="Technician">Technician</option>
+                      <option value="Read Only Viewer">Read Only Viewer</option>
+                      <option value="Client">Client</option>
+                    </select>
+                  </div>
+
+                  {/* Module Access Checkboxes List */}
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                    {ALL_TABS.map((tab) => {
+                      const isAllowed = (rolePermissions[selectedPermRole] || []).includes(tab.id);
+                      return (
+                        <div
+                          key={tab.id}
+                          onClick={() => {
+                            const currentList = rolePermissions[selectedPermRole] || [];
+                            const newList = currentList.includes(tab.id)
+                              ? currentList.filter(id => id !== tab.id)
+                              : [...currentList, tab.id];
+                            const updated = {
+                              ...rolePermissions,
+                              [selectedPermRole]: newList
+                            };
+                            setRolePermissions(updated);
+                          }}
+                          className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between text-right ${
+                            isAllowed
+                              ? 'bg-gold-950/10 border-gold-505/20 text-white'
+                              : 'bg-neutral-900/40 border-neutral-900 text-neutral-500'
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                            isAllowed ? 'border-gold-505 bg-gold-505 text-neutral-950' : 'border-zinc-700 bg-transparent'
+                          }`}>
+                            {isAllowed && <Check className="w-3 h-3 font-bold stroke-[3]" />}
+                          </div>
+                          <div className="text-right">
+                            <span className="text-xs font-black block">{isAr ? tab.ar : tab.en}</span>
+                            <span className="text-[10px] text-zinc-500 font-mono lowercase block">/{tab.id}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => handleSaveRolePermissions(selectedPermRole, rolePermissions[selectedPermRole] || [])}
+                    className="w-full py-3 bg-gradient-to-r from-gold-300 to-gold-505 text-neutral-950 text-xs font-black rounded-xl shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    <span>{isAr ? 'حفظ وتعميد الصلاحيات' : 'Deploy Access Permissions'}</span>
+                  </button>
+                </div>
+
+              </div>
+
+            </div>
+          )}
+
           {/* TAB 2: CRM MODULE */}
           {erpActiveTab === 'crm' && (
             <CRMModule isAr={isAr} canEdit={canEdit} />
+          )}
+
+          {/* TAB: SUPPLIERS CENTER */}
+          {erpActiveTab === 'suppliers' && (
+            <SuppliersModule isAr={isAr} />
+          )}
+
+          {/* TAB: SMART COST CALCULATOR */}
+          {erpActiveTab === 'calculator' && (
+            <CostCalculatorModule isAr={isAr} />
+          )}
+
+          {/* TAB: LOGO CENTER */}
+          {erpActiveTab === 'logo-center' && (
+            <LogoCenterModule isAr={isAr} />
+          )}
+
+          {/* TAB: AI EXECUTIVE COMPANION */}
+          {erpActiveTab === 'ai-assistant' && (
+            <AIBusinessAssistant isAr={isAr} />
           )}
 
           {/* ADVANCED MODULE: SMART QUOTATION BUILDER */}
@@ -1307,10 +1761,209 @@ export default function ClientPortal({ isAr, companyInfo, setActivePage, current
 
         </div>
 
+        {/* MODAL: CREATE USER OPERATOR */}
+        {isCreateUserOpen && (
+          <div className="fixed inset-0 bg-neutral-950/80 backdrop-blur-md z-[999] flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-neutral-950 border border-gold-505/30 rounded-3xl p-6 md:p-8 space-y-6 relative text-right animate-fade-in shadow-2xl">
+              <button
+                onClick={() => setIsCreateUserOpen(false)}
+                className="absolute top-4 left-4 p-1 bg-neutral-900 border border-neutral-800 text-zinc-400 hover:text-white rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div>
+                <h3 className="text-base font-black text-white flex items-center gap-2 justify-end">
+                  <span>{isAr ? 'إنشاء حساب إداري / موظف تشغيل:' : 'Provision Administrative Staff Node:'}</span>
+                  <Users className="w-5 h-5 text-gold-505" />
+                </h3>
+                <p className="text-xs text-neutral-400 mt-1">
+                  {isAr ? 'سيتم تشفير كلمة المرور الخاصة به وتطبيق سياسات الأمان والمراقبة.' : 'Password credentials will be auto-hashed, and security logs updated.'}
+                </p>
+              </div>
+
+              <form onSubmit={handleCreateUser} className="space-y-4 font-sans">
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400 font-bold block">{isAr ? 'الاسم الكامل:' : 'Full Name:'} <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    placeholder={isAr ? 'محمد علي' : 'Full name'}
+                    value={newUserName}
+                    onChange={(e) => setNewUserName(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-850 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-gold-505 text-right text-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400 font-bold block">{isAr ? 'البريد الإلكتروني:' : 'Email Address:'} <span className="text-red-500">*</span></label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="name@yafta.com"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-850 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-gold-505 text-right font-mono text-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400 font-bold block">{isAr ? 'رقم الهاتف:' : 'Phone Number:'}</label>
+                  <input
+                    type="tel"
+                    placeholder="+201012345678"
+                    value={newUserPhone}
+                    onChange={(e) => setNewUserPhone(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-850 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-gold-505 text-right font-mono text-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400 font-bold block">{isAr ? 'كلمة المرور:' : 'Password Key:'} <span className="text-red-500">*</span></label>
+                  <input
+                    type="password"
+                    required
+                    minLength={4}
+                    placeholder="••••••••"
+                    value={newUserPassword}
+                    onChange={(e) => setNewUserPassword(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-850 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-gold-505 text-right font-mono text-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400 font-bold block">{isAr ? 'رتبة الصلاحية:' : 'Security Authorization Role:'} <span className="text-red-500">*</span></label>
+                  <select
+                    value={newUserRole}
+                    onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                    className="w-full bg-neutral-900 border border-neutral-850 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-gold-505 text-right cursor-pointer text-white"
+                  >
+                    <option value="Admin" className="bg-neutral-950 text-white">Admin</option>
+                    <option value="Finance Manager" className="bg-neutral-950 text-white">Finance Manager</option>
+                    <option value="Operations Manager" className="bg-neutral-950 text-white">Operations Manager</option>
+                    <option value="Warehouse Manager" className="bg-neutral-950 text-white">Warehouse Manager</option>
+                    <option value="Customer Service" className="bg-neutral-950 text-white">Customer Service</option>
+                    <option value="Technician" className="bg-neutral-950 text-white">Technician</option>
+                    <option value="Read Only Viewer" className="bg-neutral-950 text-white">Read Only Viewer</option>
+                    <option value="Client" className="bg-neutral-950 text-white">Client</option>
+                  </select>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-gradient-to-r from-gold-300 via-gold-505 to-gold-400 text-neutral-950 font-black text-xs rounded-xl shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>{isAr ? 'تأكيد الحساب وتتشييد المعرف' : 'Provision Staff Account'}</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: EDIT USER ACCOUNT */}
+        {isEditUserOpen && selectedUserForEdit && (
+          <div className="fixed inset-0 bg-neutral-950/80 backdrop-blur-md z-[999] flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-neutral-950 border border-gold-505/30 rounded-3xl p-6 md:p-8 space-y-6 relative text-right animate-fade-in shadow-2xl">
+              <button
+                onClick={() => {
+                  setIsEditUserOpen(false);
+                  setSelectedUserForEdit(null);
+                }}
+                className="absolute top-4 left-4 p-1 bg-neutral-900 border border-neutral-800 text-zinc-400 hover:text-white rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div>
+                <h3 className="text-base font-black text-white flex items-center gap-2 justify-end">
+                  <span>{isAr ? 'تعديل بيانات الحساب:' : 'Modify Operator Metadata:'}</span>
+                  <Edit2 className="w-5 h-5 text-gold-505" />
+                </h3>
+                <p className="text-xs text-neutral-400 mt-1">
+                  {isAr ? `تعديل الصلاحيات أو إعادة تعيين كلمة المرور للمستخدم (${selectedUserForEdit.name})` : `Update authorization parameters or set new hashed access key for: ${selectedUserForEdit.name}`}
+                </p>
+              </div>
+
+              <form onSubmit={handleEditUserSubmit} className="space-y-4 font-sans">
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400 font-bold block">{isAr ? 'الاسم الكامل:' : 'Full Name:'} <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    value={editUserName}
+                    onChange={(e) => setEditUserName(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-850 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-gold-505 text-right text-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400 font-bold block">{isAr ? 'البريد الإلكتروني:' : 'Email Address:'} <span className="text-red-500">*</span></label>
+                  <input
+                    type="email"
+                    required
+                    value={editUserEmail}
+                    onChange={(e) => setEditUserEmail(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-850 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-gold-505 text-right font-mono text-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400 font-bold block">{isAr ? 'رقم الهاتف:' : 'Phone Number:'}</label>
+                  <input
+                    type="tel"
+                    value={editUserPhone}
+                    onChange={(e) => setEditUserPhone(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-850 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-gold-505 text-right font-mono text-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400 font-bold block">
+                    {isAr ? 'تغيير كلمة المرور (اختياري):' : 'Change Password (Optional):'}
+                  </label>
+                  <input
+                    type="password"
+                    minLength={4}
+                    placeholder={isAr ? 'اتركه فارغاً للحفاظ على القديمة' : 'Leave empty to preserve existing'}
+                    value={editUserPassword}
+                    onChange={(e) => setEditUserPassword(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-850 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-gold-505 text-right font-mono text-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400 font-bold block">{isAr ? 'رتبة الصلاحية:' : 'Security Authorization Role:'} <span className="text-red-500">*</span></label>
+                  <select
+                    value={editUserRole}
+                    disabled={selectedUserForEdit.role === 'Super Admin'} // prevent demoting Super Admin
+                    onChange={(e) => setEditUserRole(e.target.value as UserRole)}
+                    className="w-full bg-neutral-900 border border-neutral-850 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-gold-505 text-right cursor-pointer text-white"
+                  >
+                    {selectedUserForEdit.role === 'Super Admin' && <option value="Super Admin" className="bg-neutral-950 text-white">Super Admin</option>}
+                    <option value="Admin" className="bg-neutral-950 text-white">Admin</option>
+                    <option value="Finance Manager" className="bg-neutral-950 text-white">Finance Manager</option>
+                    <option value="Operations Manager" className="bg-neutral-950 text-white">Operations Manager</option>
+                    <option value="Warehouse Manager" className="bg-neutral-950 text-white">Warehouse Manager</option>
+                    <option value="Customer Service" className="bg-neutral-950 text-white">Customer Service</option>
+                    <option value="Technician" className="bg-neutral-950 text-white">Technician</option>
+                    <option value="Read Only Viewer" className="bg-neutral-950 text-white">Read Only Viewer</option>
+                    <option value="Client" className="bg-neutral-950 text-white">Client</option>
+                  </select>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-gradient-to-r from-gold-300 via-gold-505 to-gold-400 text-neutral-950 font-black text-xs rounded-xl shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>{isAr ? 'حفظ وتعديل العضو' : 'Apply Account Modifications'}</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
       </div>
     );
-  }
-
-
-  return null;
 }

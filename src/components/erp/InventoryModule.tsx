@@ -13,8 +13,11 @@ interface Material {
   id: string;
   nameAr: string;
   nameEn: string;
-  category: 'Acrylic' | 'Vinyl' | 'Flex' | 'LED' | 'Cladding' | 'Structure';
-  stock: number;
+  category: 'Acrylic' | 'Vinyl' | 'Flex' | 'LED' | 'Cladding' | 'Structure' | 'Stainless Steel' | 'MDF' | 'PVC' | 'Transformers' | 'Mounting';
+  stock: number; // Available Stock
+  reservedStock: number;
+  incomingStock: number;
+  cost: number;
   unitAr: string;
   unitEn: string;
   supplier: string;
@@ -44,43 +47,44 @@ interface Props {
   canEdit: boolean;
 }
 
+import { subscribeToCollection, saveDocument } from '../../utils/firebaseSync';
+
+const DEFAULT_MATERIALS: Material[] = [
+  { id: 'mat-1', nameAr: 'أكريليك كاست تايواني 3 مم شفاف', nameEn: 'Taiwanese Acrylic Cast 3mm Clear', category: 'Acrylic', stock: 145, reservedStock: 25, incomingStock: 100, cost: 750, unitAr: 'لوح', unitEn: 'sheets', supplier: 'Al-Rowad Plastics', safetyLimit: 30 },
+  { id: 'mat-2', nameAr: 'ستيكر أوراكال 651 ألماني مطفي', nameEn: 'Oracal 651 Vinyl German Matte', category: 'Vinyl', stock: 12, reservedStock: 3, incomingStock: 20, cost: 450, unitAr: 'رول', unitEn: 'rolls', supplier: 'Delta Trading', safetyLimit: 5 },
+  { id: 'mat-3', nameAr: 'بانر ستار فليكس 440 جرام كوري', nameEn: 'Star Flex Banner 440g Korean', category: 'Flex', stock: 240, reservedStock: 50, incomingStock: 150, cost: 85, unitAr: 'متر مربع', unitEn: 'sq.m', supplier: 'Sina Graphics', safetyLimit: 50 },
+  { id: 'mat-4', nameAr: 'ليد سامسونج 3 ديود كوري أصلي', nameEn: 'Samsung 3-LED Modules Low Draw', category: 'LED', stock: 85, reservedStock: 200, incomingStock: 2000, cost: 4.5, unitAr: 'ديود', unitEn: 'chips', supplier: 'Yatta Glow Co.', safetyLimit: 500 },
+  { id: 'mat-5', nameAr: 'كلادينج ألومنيوم مقاوم للحريق 4 مم', nameEn: 'Aluminium Cladding Fireproof 4mm', category: 'Cladding', stock: 38, reservedStock: 10, incomingStock: 50, cost: 1200, unitAr: 'لوح', unitEn: 'sheets', supplier: 'Emaar Metals', safetyLimit: 15 },
+  { id: 'mat-6', nameAr: 'حديد أسود مجوف سمك 2 مم للهياكل', nameEn: 'Black Steel Hollow Tubing 2mm Skeleton', category: 'Structure', stock: 95, reservedStock: 20, incomingStock: 100, cost: 380, unitAr: 'عود', unitEn: 'bars', supplier: 'El-Ezaby Iron', safetyLimit: 20 },
+  { id: 'mat-7', nameAr: 'صاج ستانلس ستيل مقاوم للصدأ 304 ليزر', nameEn: 'Stainless Steel Sheet Rustproof 304 Laser', category: 'Stainless Steel', stock: 28, reservedStock: 5, incomingStock: 20, cost: 1800, unitAr: 'لوح', unitEn: 'sheets', supplier: 'Al-Rowad Plastics', safetyLimit: 10 },
+  { id: 'mat-8', nameAr: 'خشب إم دي اف سمك 9 مم تايلاندي مميز', nameEn: 'Thai MDF Wood Board 9mm Premium', category: 'MDF', stock: 45, reservedStock: 8, incomingStock: 30, cost: 520, unitAr: 'لوح', unitEn: 'sheets', supplier: 'Delta Trading', safetyLimit: 15 },
+  { id: 'mat-9', nameAr: 'ألواح بي في سي عازل سمك 5 مم للتثبيت', nameEn: 'PVC Foam Board Insulation 5mm Mounted', category: 'PVC', stock: 60, reservedStock: 15, incomingStock: 40, cost: 350, unitAr: 'لوح', unitEn: 'sheets', supplier: 'Al-Rowad Plastics', safetyLimit: 15 },
+  { id: 'mat-10', nameAr: 'محول كهرباء ليد مضاد للمطر 12 فولت', nameEn: 'Rainproof LED Transformer 12V 400W', category: 'Transformers', stock: 32, reservedStock: 10, incomingStock: 50, cost: 280, unitAr: 'قطعة', unitEn: 'pcs', supplier: 'Yatta Glow Co.', safetyLimit: 10 },
+  { id: 'mat-11', nameAr: 'إكسسوارات تركيب وتثبيت الحروف المعدنية', nameEn: 'Premium Mounting Studs & Screws Bag', category: 'Mounting', stock: 150, reservedStock: 30, incomingStock: 200, cost: 15, unitAr: 'حقيبة', unitEn: 'bags', supplier: 'Yatta Glow Co.', safetyLimit: 40 }
+];
+
+const DEFAULT_SUPPLIERS: Supplier[] = [
+  { id: 'sup-1', name: 'Al-Rowad Plastics', contact: '+201009988771', materials: 'Acrylic Cast, PVC Sheets', rating: 4.8, status: 'active' },
+  { id: 'sup-2', name: 'Delta Trading', contact: '+201223344556', materials: 'Oracal Vinyl, Double-tape', rating: 4.2, status: 'active' },
+  { id: 'sup-3', name: 'Yatta Glow Co.', contact: '+201050512141', materials: 'Samsung LED, Transformers', rating: 5.0, status: 'active' },
+  { id: 'sup-4', name: 'El-Ezaby Iron', contact: '+201111222333', materials: 'Steel pipes, welding wire', rating: 4.5, status: 'active' },
+  { id: 'sup-5', name: 'Sina Graphics', contact: '+201002233445', materials: 'Flex, Banner Rolls', rating: 4.7, status: 'active' },
+  { id: 'sup-6', name: 'Emaar Metals', contact: '+201201201201', materials: 'Aluminium Cladding Panels', rating: 4.9, status: 'active' }
+];
+
+const DEFAULT_MOVEMENTS: StockMovement[] = [
+  { id: 'mov-1', materialName: 'Taiwanese Acrylic Cast 3mm Clear', type: 'Out', qty: 15, notes: 'Consumed for Mado sign face panels', date: '2026-06-18 10:30 AM' },
+  { id: 'mov-2', materialName: 'Samsung 3-LED Modules Low Draw', type: 'In', qty: 2500, notes: 'Restocked by Yatta Glow Co. Order #90', date: '2026-06-15 01:20 PM' },
+  { id: 'mov-3', materialName: 'Aluminium Cladding Fireproof 4mm', type: 'Out', qty: 24, notes: 'Facade coverage cladding skeleton', date: '2026-06-12 04:45 PM' }
+];
+
 export default function InventoryModule({ isAr, canEdit }: Props) {
   // Stock materials
-  const [materials, setMaterials] = useState<Material[]>(() => {
-    const saved = localStorage.getItem('yafta_erp_materials');
-    if (saved) return JSON.parse(saved);
-    return [
-      { id: 'mat-1', nameAr: 'أكريليك كاست تايواني 3 مم شفاف', nameEn: 'Taiwanese Acrylic Cast 3mm Clear', category: 'Acrylic', stock: 145, unitAr: 'لوح', unitEn: 'sheets', supplier: 'Al-Rowad Plastics', safetyLimit: 30 },
-      { id: 'mat-2', nameAr: 'ستيكر أوراكال 651 ألماني مطفي', nameEn: 'Oracal 651 Vinyl German Matte', category: 'Vinyl', stock: 12, unitAr: 'رول', unitEn: 'rolls', supplier: 'Delta Trading', safetyLimit: 5 },
-      { id: 'mat-3', nameAr: 'بانر ستار فليكس 440 جرام كوري', nameEn: 'Star Flex Banner 440g Korean', category: 'Flex', stock: 240, unitAr: 'متر مربع', unitEn: 'sq.m', supplier: 'Sina Graphics', safetyLimit: 50 },
-      { id: 'mat-4', nameAr: 'ليد سامسونج 3 ديود كوري أصلي', nameEn: 'Samsung 3-LED Modules Low Draw', category: 'LED', stock: 85, unitAr: 'ديود', unitEn: 'chips', supplier: 'Yatta Glow Co.', safetyLimit: 500 }, // Trigger warning on startup!
-      { id: 'mat-5', nameAr: 'كلادينج ألومنيوم مقاوم للحريق 4 مم', nameEn: 'Aluminium Cladding Fireproof 4mm', category: 'Cladding', stock: 38, unitAr: 'لوح', unitEn: 'sheets', supplier: 'Emaar Metals', safetyLimit: 15 },
-      { id: 'mat-6', nameAr: 'حديد أسود مجوف سمك 2 مم للهياكل', nameEn: 'Black Steel Hollow Tubing 2mm Skeleton', category: 'Structure', stock: 95, unitAr: 'عود', unitEn: 'bars', supplier: 'El-Ezaby Iron', safetyLimit: 20 }
-    ];
-  });
-
+  const [materials, setMaterials] = useState<Material[]>([]);
   // Suppliers
-  const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
-    const saved = localStorage.getItem('yafta_erp_suppliers');
-    if (saved) return JSON.parse(saved);
-    return [
-      { id: 'sup-1', name: 'Al-Rowad Plastics', contact: '+201009988771', materials: 'Acrylic Cast, PVC Sheets', rating: 4.8, status: 'active' },
-      { id: 'sup-2', name: 'Delta Trading', contact: '+201223344556', materials: 'Oracal Vinyl, Double-tape', rating: 4.2, status: 'active' },
-      { id: 'sup-3', name: 'Yatta Glow Co.', contact: '+201050512141', materials: 'Samsung LED, Transformers', rating: 5.0, status: 'active' },
-      { id: 'sup-4', name: 'El-Ezaby Iron', contact: '+201111222333', materials: 'Steel pipes, welding wire', rating: 4.5, status: 'active' }
-    ];
-  });
-
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   // Stock movements log
-  const [movements, setMovements] = useState<StockMovement[]>(() => {
-    const saved = localStorage.getItem('yafta_erp_movements');
-    if (saved) return JSON.parse(saved);
-    return [
-      { id: 'mov-1', materialName: 'Taiwanese Acrylic Cast 3mm Clear', type: 'Out', qty: 15, notes: 'Consumed for Mado sign face panels', date: '2026-06-18 10:30 AM' },
-      { id: 'mov-2', materialName: 'Samsung 3-LED Modules Low Draw', type: 'In', qty: 2500, notes: 'Restocked by Yatta Glow Co. Order #90', date: '2026-06-15 01:20 PM' },
-      { id: 'mov-3', materialName: 'Aluminium Cladding Fireproof 4mm', type: 'Out', qty: 24, notes: 'Facade coverage cladding skeleton', date: '2026-06-12 04:45 PM' }
-    ];
-  });
+  const [movements, setMovements] = useState<StockMovement[]>([]);
 
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -90,8 +94,11 @@ export default function InventoryModule({ isAr, canEdit }: Props) {
   // Form States
   const [nameAr, setNameAr] = useState('');
   const [nameEn, setNameEn] = useState('');
-  const [category, setCategory] = useState<'Acrylic' | 'Vinyl' | 'Flex' | 'LED' | 'Cladding' | 'Structure'>('Acrylic');
+  const [category, setCategory] = useState<'Acrylic' | 'Vinyl' | 'Flex' | 'LED' | 'Cladding' | 'Structure' | 'Stainless Steel' | 'MDF' | 'PVC' | 'Transformers' | 'Mounting'>('Acrylic');
   const [stock, setStock] = useState(50);
+  const [reservedStock, setReservedStock] = useState(0);
+  const [incomingStock, setIncomingStock] = useState(0);
+  const [cost, setCost] = useState(100);
   const [unitAr, setUnitAr] = useState('لوح');
   const [unitEn, setUnitEn] = useState('sheets');
   const [supplier, setSupplier] = useState('');
@@ -103,17 +110,18 @@ export default function InventoryModule({ isAr, canEdit }: Props) {
   const [moveQty, setMoveQty] = useState(10);
   const [moveNotes, setMoveNotes] = useState('');
 
+  // Setup Firestore live-synced subscriptions
   useEffect(() => {
-    localStorage.setItem('yafta_erp_materials', JSON.stringify(materials));
-  }, [materials]);
+    const unsubMaterials = subscribeToCollection<Material>('materials', 'yafta_erp_materials', DEFAULT_MATERIALS, setMaterials);
+    const unsubSuppliers = subscribeToCollection<Supplier>('suppliers', 'yafta_erp_suppliers', DEFAULT_SUPPLIERS, setSuppliers);
+    const unsubMovements = subscribeToCollection<StockMovement>('movements', 'yafta_erp_movements', DEFAULT_MOVEMENTS, setMovements);
 
-  useEffect(() => {
-    localStorage.setItem('yafta_erp_suppliers', JSON.stringify(suppliers));
-  }, [suppliers]);
-
-  useEffect(() => {
-    localStorage.setItem('yafta_erp_movements', JSON.stringify(movements));
-  }, [movements]);
+    return () => {
+      unsubMaterials();
+      unsubSuppliers();
+      unsubMovements();
+    };
+  }, []);
 
   const handleCreateMaterial = (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,13 +133,16 @@ export default function InventoryModule({ isAr, canEdit }: Props) {
       nameEn,
       category,
       stock,
+      reservedStock: reservedStock || 0,
+      incomingStock: incomingStock || 0,
+      cost: cost || 0,
       unitAr,
       unitEn,
       supplier: supplier || suppliers[0]?.name || 'Direct Wholesale',
       safetyLimit
     };
 
-    setMaterials([...materials, newMat]);
+    saveDocument<Material>('materials', 'yafta_erp_materials', newMat.id, newMat);
     setNameAr('');
     setNameEn('');
     setAddingMaterial(false);
@@ -152,7 +163,7 @@ export default function InventoryModule({ isAr, canEdit }: Props) {
 
     // Update stock levels
     const finalStock = moveType === 'In' ? mat.stock + moveQty : mat.stock - moveQty;
-    setMaterials(materials.map(m => m.id === targetMaterialId ? { ...m, stock: finalStock } : m));
+    saveDocument<Material>('materials', 'yafta_erp_materials', targetMaterialId, { stock: finalStock });
 
     // Save movement transaction
     const newMovement: StockMovement = {
@@ -164,7 +175,7 @@ export default function InventoryModule({ isAr, canEdit }: Props) {
       date: new Date().toISOString().replace('T', ' ').substring(0, 16)
     };
 
-    setMovements([newMovement, ...movements]);
+    saveDocument<StockMovement>('movements', 'yafta_erp_movements', newMovement.id, newMovement);
     setRecordingMovement(false);
     setMoveNotes('');
     alert(isAr ? 'تم حفظ المعاملة وتدقيق ميزان المخازن فوراً!' : 'Stock movement transaction verified and logged.');
@@ -261,6 +272,11 @@ export default function InventoryModule({ isAr, canEdit }: Props) {
                 <option value="LED">{isAr ? 'ليدات ومحولات' : 'LED'}</option>
                 <option value="Cladding">{isAr ? 'ألواح الألمنيوم' : 'Cladding'}</option>
                 <option value="Structure">{isAr ? 'الحديد والهياكل' : 'Steel Skeleton'}</option>
+                <option value="Stainless Steel">{isAr ? 'ستانلس ستيل' : 'Stainless Steel'}</option>
+                <option value="MDF">{isAr ? 'خشب MDF' : 'MDF Wood'}</option>
+                <option value="PVC">{isAr ? 'ألواح PVC' : 'PVC Panels'}</option>
+                <option value="Transformers">{isAr ? 'ترانسات ومحولات' : 'Transformers'}</option>
+                <option value="Mounting">{isAr ? 'إكسسوارات التركيب' : 'Mounting Acc.'}</option>
               </select>
 
               <div className="relative">
@@ -282,7 +298,11 @@ export default function InventoryModule({ isAr, canEdit }: Props) {
                 <tr>
                   <th className="p-3 text-right">{isAr ? 'الصنف الفني' : 'Material Specification'}</th>
                   <th className="p-3 text-right">{isAr ? 'التصنيف' : 'Category'}</th>
-                  <th className="p-3 text-right">{isAr ? 'الرصيد المتاح' : 'Available Stock'}</th>
+                  <th className="p-3 text-center">{isAr ? 'تكلفة الوحدة' : 'Unit Cost'}</th>
+                  <th className="p-3 text-center">{isAr ? 'الرصيد الكلي' : 'Total Current'}</th>
+                  <th className="p-3 text-center text-emerald-400">{isAr ? 'المتاح للإنتاج' : 'Available'}</th>
+                  <th className="p-3 text-center text-orange-400">{isAr ? 'المحجوز حالياً' : 'Reserved'}</th>
+                  <th className="p-3 text-center text-blue-400">{isAr ? 'الوارد المنتظر' : 'Incoming'}</th>
                   <th className="p-3 text-right">{isAr ? 'المورد المعتمد' : 'Wholesale Supplier'}</th>
                   <th className="p-3 text-right">{isAr ? 'حد الأمان' : 'Safety Margin'}</th>
                 </tr>
@@ -292,20 +312,32 @@ export default function InventoryModule({ isAr, canEdit }: Props) {
                   <tr key={mat.id} className="hover:bg-neutral-900/30">
                     <td className="p-3 font-medium">
                       <span className="block text-white font-bold">{isAr ? mat.nameAr : mat.nameEn}</span>
-                      <span className="text-[10px] text-zinc-500 font-mono">SKU: YAFTA-{mat.id.toUpperCase()}</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">YAFTA-{mat.id.toUpperCase()}</span>
                     </td>
-                    <td className="p-3 text-zinc-400">{mat.category}</td>
-                    <td className="p-3 font-mono font-bold">
+                    <td className="p-3 text-zinc-400 font-medium">{mat.category}</td>
+                    <td className="p-3 text-center font-mono text-zinc-300 font-bold">
+                      {mat.cost || 0} EGP
+                    </td>
+                    <td className="p-3 text-center font-mono text-white font-black">
+                      {(mat.stock || 0) + (mat.reservedStock || 0)} {isAr ? mat.unitAr : mat.unitEn}
+                    </td>
+                    <td className="p-3 text-center font-mono font-bold">
                       <span className={`px-2 py-0.5 rounded ${
                         mat.stock < mat.safetyLimit 
                           ? 'bg-rose-950 text-rose-300 border border-rose-500/20' 
-                          : 'text-white'
+                          : 'bg-emerald-950/40 text-emerald-400'
                       }`}>
                         {mat.stock} {isAr ? mat.unitAr : mat.unitEn}
                       </span>
                     </td>
+                    <td className="p-3 text-center font-mono text-orange-400">
+                      {mat.reservedStock || 0} {isAr ? mat.unitAr : mat.unitEn}
+                    </td>
+                    <td className="p-3 text-center font-mono text-blue-400">
+                      {mat.incomingStock || 0} {isAr ? mat.unitAr : mat.unitEn}
+                    </td>
                     <td className="p-3 text-zinc-400">{mat.supplier}</td>
-                    <td className="p-3 font-mono text-zinc-500">{mat.safetyLimit}</td>
+                    <td className="p-3 font-mono text-zinc-500 text-center">{mat.safetyLimit}</td>
                   </tr>
                 ))}
               </tbody>
@@ -396,6 +428,11 @@ export default function InventoryModule({ isAr, canEdit }: Props) {
                     <option value="LED">LED</option>
                     <option value="Cladding">Cladding</option>
                     <option value="Structure">Structure</option>
+                    <option value="Stainless Steel">Stainless Steel</option>
+                    <option value="MDF">MDF Wood</option>
+                    <option value="PVC">PVC Panel</option>
+                    <option value="Transformers">Transformers</option>
+                    <option value="Mounting">Mounting Accessories</option>
                   </select>
                 </div>
 
@@ -415,12 +452,44 @@ export default function InventoryModule({ isAr, canEdit }: Props) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs text-neutral-300 font-bold block">{isAr ? 'المخزون الأولي المتاح:' : 'Initial Quantity:'}</label>
+                  <label className="text-xs text-neutral-300 font-bold block">{isAr ? 'المخزون المتاح (Available):' : 'Available Qty:'}</label>
                   <input
                     type="number"
                     value={stock}
                     onChange={(e) => setStock(parseInt(e.target.value) || 0)}
                     className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs text-white text-center font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs text-neutral-300 font-bold block">{isAr ? 'المخزون المحجوز (Reserved):' : 'Reserved Qty:'}</label>
+                  <input
+                    type="number"
+                    value={reservedStock}
+                    onChange={(e) => setReservedStock(parseInt(e.target.value) || 0)}
+                    className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs text-white text-center font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-neutral-300 font-bold block">{isAr ? 'المخزون المنتظر (Incoming):' : 'Incoming Qty:'}</label>
+                  <input
+                    type="number"
+                    value={incomingStock}
+                    onChange={(e) => setIncomingStock(parseInt(e.target.value) || 0)}
+                    className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs text-white text-center font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-neutral-300 font-bold block">{isAr ? 'سعر تكلفة الوحدة (Cost):' : 'Unit Cost (EGP):'}</label>
+                  <input
+                    type="number"
+                    value={cost}
+                    onChange={(e) => setCost(parseInt(e.target.value) || 0)}
+                    className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs text-gold-300 text-center font-mono font-bold"
                   />
                 </div>
               </div>

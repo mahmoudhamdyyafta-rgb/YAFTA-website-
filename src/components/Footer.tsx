@@ -139,6 +139,16 @@ export default function Footer({ setActivePage, isAr, companyInfo, logoConfig }:
                   {isAr ? '• بوابة تتبع المشروعات الذكية' : '• Client Portal System'}
                 </button>
               </li>
+              <li>
+                <button onClick={() => handlePageTransition('track-repair')} className="hover:text-gold-505 hover:underline transition-colors block text-right">
+                  {isAr ? '• تتبع طلبات الصيانة 🛠️' : '• Track Maintenance 🛠️'}
+                </button>
+              </li>
+              <li>
+                <button onClick={() => handlePageTransition('offers')} className="hover:text-gold-505 hover:underline transition-colors block text-right">
+                  {isAr ? '• العروض والخصومات الحصرية 🏷️' : '• Special Offers & Discounts 🏷️'}
+                </button>
+              </li>
             </ul>
           </div>
 
