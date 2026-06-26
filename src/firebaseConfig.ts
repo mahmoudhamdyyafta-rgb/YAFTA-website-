@@ -10,7 +10,7 @@ const firebaseConfig = {
   projectId: (import.meta as any).env.VITE_FIREBASE_PROJECT_ID || 'gen-lang-client-0982972904',
   storageBucket: (import.meta as any).env.VITE_FIREBASE_STORAGE_BUCKET || 'gen-lang-client-0982972904.firebasestorage.app',
   messagingSenderId: (import.meta as any).env.VITE_FIREBASE_MESSAGING_SENDER_ID || '612962549207',
-  appId: (import.meta as any).env.VITE_FIREBASE_APP_ID || '1:612962549207:web:a57e8b2ae2852717731f92',
+  appId: (import.meta as any).env.VITE_FIREBASE_APP_ID || '1:612962549207:web:2b14d2e0678a9d3b731f92',
 };
 
 const databaseId = (import.meta as any).env.VITE_FIREBASE_DATABASE_ID || 'ai-studio-d52c5b23-f7b7-417f-b089-3d8f336fcf6a';

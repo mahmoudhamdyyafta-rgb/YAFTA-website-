@@ -217,6 +217,40 @@ export default function ClientPortal({ isAr, companyInfo, setActivePage, current
   // Admin users list state
   const [usersList, setUsersList] = useState<UserAccount[]>([]);
 
+  // Real-time synchronization version controller for nested ERP components
+  const [syncVersion, setSyncVersion] = useState(0);
+
+  useEffect(() => {
+    const handleStorageUpdate = (e: any) => {
+      const erpKeys = [
+        'yafta_users_list', 'yafta_portal_activities', 'yafta_client_blueprints',
+        'yafta_client_invoices', 'yafta_project_requests', 'yafta_employee_tasks',
+        'yafta_portal_chat_messages', 'yafta_erp_leads', 'yafta_erp_calllogs',
+        'yafta_suppliers', 'yafta_dealers', 'yafta_calculator_quotes',
+        'yafta_contracts_list', 'yafta_legal_docs', 'yafta_dam_assets',
+        'yafta_quotations', 'yafta_procurement_suppliers', 'yafta_purchase_requests',
+        'yafta_rfqs_compare', 'yafta_purchase_orders', 'yafta_supplier_invoices',
+        'yafta_supplier_payments', 'yafta_erp_employees', 'yafta_erp_leave_requests',
+        'yafta_erp_finance', 'yafta_treasury_accounts', 'yafta_treasury_transfers',
+        'yafta_reconciliation_checklist', 'yafta_erp_projects', 'yafta_erp_installations',
+        'yafta_site_surveys', 'yafta_installation_jobs', 'yafta_automation_rules',
+        'yafta_automation_logs', 'yafta_seo_keywords'
+      ];
+      if (erpKeys.includes(e.detail.key)) {
+        if (e.detail.key === 'yafta_users_list' && e.detail.value) {
+          try {
+            setUsersList(JSON.parse(e.detail.value));
+          } catch (err) {
+            console.error(err);
+          }
+        }
+        setSyncVersion(v => v + 1);
+      }
+    };
+    window.addEventListener('local-storage-update', handleStorageUpdate);
+    return () => window.removeEventListener('local-storage-update', handleStorageUpdate);
+  }, []);
+
   useEffect(() => {
     // Load registered users list from local storage
     const listRaw = localStorage.getItem('yafta_users_list');
@@ -1666,97 +1700,135 @@ export default function ClientPortal({ isAr, companyInfo, setActivePage, current
 
           {/* TAB 2: CRM MODULE */}
           {erpActiveTab === 'crm' && (
-            <CRMModule isAr={isAr} canEdit={canEdit} />
+            <div key={`crm-${syncVersion}`} className="w-full">
+              <CRMModule isAr={isAr} canEdit={canEdit} />
+            </div>
           )}
 
           {/* TAB: SUPPLIERS CENTER */}
           {erpActiveTab === 'suppliers' && (
-            <SuppliersModule isAr={isAr} />
+            <div key={`suppliers-${syncVersion}`} className="w-full">
+              <SuppliersModule isAr={isAr} />
+            </div>
           )}
 
           {/* TAB: SMART COST CALCULATOR */}
           {erpActiveTab === 'calculator' && (
-            <CostCalculatorModule isAr={isAr} />
+            <div key={`calculator-${syncVersion}`} className="w-full">
+              <CostCalculatorModule isAr={isAr} />
+            </div>
           )}
 
           {/* TAB: LOGO CENTER */}
           {erpActiveTab === 'logo-center' && (
-            <LogoCenterModule isAr={isAr} />
+            <div key={`logo-center-${syncVersion}`} className="w-full">
+              <LogoCenterModule isAr={isAr} />
+            </div>
           )}
 
           {/* TAB: AI EXECUTIVE COMPANION */}
           {erpActiveTab === 'ai-assistant' && (
-            <AIBusinessAssistant isAr={isAr} />
+            <div key={`ai-assistant-${syncVersion}`} className="w-full">
+              <AIBusinessAssistant isAr={isAr} />
+            </div>
           )}
 
           {/* ADVANCED MODULE: SMART QUOTATION BUILDER */}
           {erpActiveTab === 'quotation' && (
-            <QuotationBuilderModule isAr={isAr} canEdit={canEdit} />
+            <div key={`quotation-${syncVersion}`} className="w-full">
+              <QuotationBuilderModule isAr={isAr} canEdit={canEdit} />
+            </div>
           )}
 
           {/* ADVANCED MODULE: CONTRACT MANAGEMENT */}
           {erpActiveTab === 'contract' && (
-            <ContractManagementModule isAr={isAr} canEdit={canEdit} />
+            <div key={`contract-${syncVersion}`} className="w-full">
+              <ContractManagementModule isAr={isAr} canEdit={canEdit} />
+            </div>
           )}
 
           {/* TAB 3: INVENTORY MODULE */}
           {erpActiveTab === 'inventory' && (
-            <InventoryModule isAr={isAr} canEdit={canEdit} />
+            <div key={`inventory-${syncVersion}`} className="w-full">
+              <InventoryModule isAr={isAr} canEdit={canEdit} />
+            </div>
           )}
 
           {/* ADVANCED MODULE: PROCUREMENT */}
           {erpActiveTab === 'procurement' && (
-            <ProcurementModule isAr={isAr} canEdit={canEdit} />
+            <div key={`procurement-${syncVersion}`} className="w-full">
+              <ProcurementModule isAr={isAr} canEdit={canEdit} />
+            </div>
           )}
 
           {/* TAB 4: HR MODULE */}
           {erpActiveTab === 'hr' && (
-            <HRModule isAr={isAr} canEdit={canEdit} />
+            <div key={`hr-${syncVersion}`} className="w-full">
+              <HRModule isAr={isAr} canEdit={canEdit} />
+            </div>
           )}
 
           {/* TAB 5: FINANCIAL DATA LOGS */}
           {erpActiveTab === 'financial' && (
-            <FinancialModule isAr={isAr} canEdit={canEdit} />
+            <div key={`financial-${syncVersion}`} className="w-full">
+              <FinancialModule isAr={isAr} canEdit={canEdit} />
+            </div>
           )}
 
           {/* ADVANCED MODULE: TREASURY & BANKING */}
           {erpActiveTab === 'treasury' && (
-            <TreasuryBankingModule isAr={isAr} canEdit={canEdit} />
+            <div key={`treasury-${syncVersion}`} className="w-full">
+              <TreasuryBankingModule isAr={isAr} canEdit={canEdit} />
+            </div>
           )}
 
           {/* TAB 6: PROJECTS PIPELINE ROUTING */}
           {erpActiveTab === 'projects' && (
-            <ProjectTrackingModule isAr={isAr} canEdit={canEdit} />
+            <div key={`projects-${syncVersion}`} className="w-full">
+              <ProjectTrackingModule isAr={isAr} canEdit={canEdit} />
+            </div>
           )}
 
           {/* ADVANCED MODULE: SITE MANAGEMENT */}
           {erpActiveTab === 'site' && (
-            <SiteManagementModule isAr={isAr} canEdit={canEdit} />
+            <div key={`site-${syncVersion}`} className="w-full">
+              <SiteManagementModule isAr={isAr} canEdit={canEdit} />
+            </div>
           )}
 
           {/* ADVANCED MODULE: WORKFLOW AUTOMATION */}
           {erpActiveTab === 'workflow' && (
-            <WorkflowAutomationModule isAr={isAr} canEdit={canEdit} />
+            <div key={`workflow-${syncVersion}`} className="w-full">
+              <WorkflowAutomationModule isAr={isAr} canEdit={canEdit} />
+            </div>
           )}
 
           {/* TAB 7: REPORTING & ANALYTICS DATA SHEETS */}
           {erpActiveTab === 'reports' && (
-            <ReportingCenterModule isAr={isAr} />
+            <div key={`reports-${syncVersion}`} className="w-full">
+              <ReportingCenterModule isAr={isAr} />
+            </div>
           )}
 
           {/* ADVANCED MODULE: SEO MARKETING */}
           {erpActiveTab === 'seo' && (
-            <SeoMarketingModule isAr={isAr} canEdit={canEdit} />
+            <div key={`seo-${syncVersion}`} className="w-full">
+              <SeoMarketingModule isAr={isAr} canEdit={canEdit} />
+            </div>
           )}
 
           {/* ADVANCED MODULE: DIGITAL ASSETS DAM */}
           {erpActiveTab === 'dam' && (
-            <DAMModule isAr={isAr} canEdit={canEdit} userRole={currentUser.role} />
+            <div key={`dam-${syncVersion}`} className="w-full">
+              <DAMModule isAr={isAr} canEdit={canEdit} userRole={currentUser.role} />
+            </div>
           )}
 
           {/* TAB 8: ANDROID APP EMULATOR CLIENT */}
           {erpActiveTab === 'android' && (
-            <AndroidModule isAr={isAr} />
+            <div key={`android-${syncVersion}`} className="w-full">
+              <AndroidModule isAr={isAr} />
+            </div>
           )}
 
         </div>
